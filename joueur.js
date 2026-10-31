@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.4.2
+   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page joueur : rejoindre une partie, voir la question, répondre avant la fin du chrono, voir ses badges.
    Avec ?ecran=1, la même page sert d'écran à projeter (question, chrono, réponse révélée,
@@ -160,6 +160,7 @@ function renderCard() {
     (ECRAN ? '<section class="status" id="status"></section>' : "");
   Q.fitCards(app);
   bindHeader();
+  seenEtat[c.id] = null;
   var ta = byId("ans");
   if (ta) {
     ta.value = draftByCard[c.id] || "";
@@ -175,6 +176,30 @@ function renderCard() {
 function mine() {
   var c = P.carte, R = (P.reponses && P.reponses[c.id]) || {};
   return R[uid] || null;
+}
+/* « Mais encore ? » : le maître du jeu demande plus de précision sur la version envoyée. */
+function askedMore() {
+  var c = P.carte, r = mine(), V = (P.verdicts && P.verdicts[c.id]) || {};
+  return !!(r && V[uid] && V[uid].v === r.v && V[uid].more);
+}
+/* « Non » du maître du jeu sur la version envoyée. */
+function refused() {
+  var c = P.carte, r = mine(), V = (P.verdicts && P.verdicts[c.id]) || {};
+  return !!(r && V[uid] && V[uid].v === r.v && V[uid].ok === false && !V[uid].more);
+}
+function myPlus() { var c = P.carte; return c && c.plus && c.plus[uid] ? c.plus[uid] : 0; }
+/* Peut-on encore envoyer ? Chrono de la carte, ou délai personnel accordé par « Mais encore ? ». */
+function canAnswer() {
+  var c = P.carte;
+  if (!c || c.etat === "revelee") return false;
+  if (c.etat === "ouverte" && Q.timeLeft(c) > 0) return true;
+  return myPlus() > Q.now();
+}
+/* Chrono affiché chez le joueur : son délai personnel s'il en a un plus long. */
+function myClock() {
+  var c = P.carte, pl = myPlus();
+  if (!ECRAN && pl && c.etat !== "revelee" && pl > (c.etat === "ouverte" ? c.fin : 0)) return { etat: "ouverte", fin: pl, duree: Math.max(30, Math.round((pl - (c.fin || pl)) / 1000)) };
+  return c;
 }
 function update() {
   if (!P) return;
@@ -193,15 +218,16 @@ function update() {
       return '<span class="st-chip ' + cls + (p.enLigne ? "" : " off") + '">' + esc(p.nom) + (cls === "ok" ? " ✓" : cls === "sent" ? " ·" : "") + "</span>";
     }).join("") + "</div>";
   }
-  Q.paintTimer(c);
+  Q.paintTimer(myClock());
   if (c.etat === "revelee") showAnswer();
   updateForm();
 }
 /* Le chrono tourne aussi entre deux messages de la base. */
 setInterval(function () {
   if (!P || !P.carte || !screenKey || screenKey.indexOf("card-") !== 0) return;
-  var up = Q.paintTimer(P.carte);
-  if (up && seenEtat[P.carte.id] !== "up") { seenEtat[P.carte.id] = "up"; updateForm(); }
+  Q.paintTimer(myClock());
+  var st = canAnswer() ? "open" : "up";
+  if (seenEtat[P.carte.id] !== st) { seenEtat[P.carte.id] = st; updateForm(); }
 }, 250);
 
 function showAnswer() {
@@ -230,7 +256,7 @@ function updateForm() {
   var ta = byId("ans"), btn = byId("btnSend"), fb = byId("fb"), hint = byId("hint");
   if (!ta) return;
   var c = P.carte, r = mine(), revealed = c.etat === "revelee";
-  var closed = !revealed && (c.etat === "fermee" || Q.timeLeft(c) <= 0);
+  var closed = !revealed && !canAnswer(), more = !revealed && askedMore();
   var text = ta.value.trim(), sentTxt = r ? String(r.txt).trim() : null;
   var fbClass = "", fbText = "", label = "Envoyer", enabled = !!text, hintText = "";
   if (revealed) {
@@ -243,8 +269,16 @@ function updateForm() {
   } else if (closed) {
     enabled = false;
     fbClass = "wait"; fbText = r ? "Temps écoulé ! Le maître du jeu corrige les réponses." : "Temps écoulé. Tu n'as pas envoyé de réponse cette fois.";
+  } else if (more) {
+    fbClass = "more"; fbText = "Mais encore ? Le maître du jeu te demande d'être plus précis. Complète ta réponse et renvoie-la.";
+    if (text && text !== sentTxt) { label = "Renvoyer"; enabled = true; }
+    else { label = "Renvoyer"; enabled = false; hintText = "Complète ta réponse pour la renvoyer."; }
+  } else if (refused()) {
+    fbClass = "ko"; fbText = "✗ Non. Le maître du jeu a refusé ta réponse. Tu peux la corriger et la renvoyer avant la fin du temps.";
+    label = "Renvoyer"; enabled = !!text && text !== sentTxt;
+    if (!text || text === sentTxt) hintText = "Modifie ta réponse pour la renvoyer.";
   } else if (r) {
-    fbClass = "wait"; fbText = "Réponse envoyée ✓. Tu peux la modifier jusqu'à la fin du temps.";
+    fbClass = "wait"; fbText = myPlus() ? "Réponse complétée ✓. Le maître du jeu la relit." : "Réponse envoyée ✓. Tu peux la modifier jusqu'à la fin du temps.";
     if (text && text !== sentTxt) { label = "Modifier"; enabled = true; }
     else { label = "Envoyée ✓"; enabled = false; }
   }
@@ -258,11 +292,12 @@ function updateForm() {
     fb.hidden = !fbText;
     fb.className = "feedback " + fbClass;
     fb.textContent = fbText;
+    if ((fbClass === "more" || (fbClass === "ko" && !revealed)) && navigator.vibrate) { try { navigator.vibrate([120, 80, 120]); } catch (e) {} }
   }
 }
 function send() {
   var ta = byId("ans"), c = P && P.carte;
-  if (!ta || !c || sending || c.etat !== "ouverte" || Q.timeLeft(c) <= 0) return;
+  if (!ta || !c || sending || !canAnswer()) return;
   var txt = ta.value.trim().slice(0, 500), r = mine();
   if (!txt || (r && String(r.txt).trim() === txt)) return;
   sending = true; updateForm();

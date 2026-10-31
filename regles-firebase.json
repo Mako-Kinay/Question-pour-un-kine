@@ -13,7 +13,7 @@
         "reponses": {
           "$cid": {
             "$uid": {
-              ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000",
+              ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && ((root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000) || (root.child('parties').child($code).child('carte/etat').val() !== 'revelee' && root.child('parties').child($code).child('carte/plus').child($uid).exists() && now <= root.child('parties').child($code).child('carte/plus').child($uid).val() + 2000))",
               ".validate": "newData.child('txt').isString() && newData.child('txt').val().length <= 500 && newData.child('v').isNumber() && newData.child('ts').val() === now"
             }
           }

@@ -1,12 +1,12 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.4.2
+   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Question pour un kiné – multijoueur : outils communs au maître du jeu, aux joueurs et à l'écran projeté.
    - Connexion : Firebase (si config.js est rempli) ou mode démo (onglets d'un même navigateur).
    - Visuels : catégories, badges, cartes, bannières, confettis, chrono. */
 window.QPK = (function () {
 "use strict";
-var VERSION = "Multijoueur v1.4.2";
+var VERSION = "Multijoueur v1.5.1";
 var CATS = [
   { id: "Développement", color: "#1E9E54", text: "#FFFFFF" },
   { id: "Neurologie", color: "#2457D6", text: "#FFFFFF" },
@@ -544,7 +544,7 @@ function demoBanner() {
   return '<div class="demo-note"><strong>Mode démo.</strong> La partie ne passe pas par internet : elle se joue entre les onglets de ce navigateur, sur cet ordinateur. Pour jouer avec des téléphones, remplissez config.js (voir le guide).</div>';
 }
 
-/* ====================== Page de démarrage et mentions (v1.4.2) ====================== */
+/* ====================== Page de démarrage et mentions (v1.5.1) ====================== */
 var AUTEUR = "Maxime KOSMALA, MKDE", ANNEE = "2026";
 function splashHTML() {
   // Trois badges tirés au hasard : bronze, or au centre, argent.
@@ -611,9 +611,25 @@ function footer() {
   document.body.appendChild(f);
   byId("btnMentions").onclick = function () { splash(true); };
 }
+/* Mode sombre forcé (Samsung Internet surtout) : il fausse les couleurs du jeu.
+   Le site déclare gérer le sombre lui-même (balise color-scheme), ce que les navigateurs récents respectent.
+   Pour Samsung Internet, qui ne le respecte pas toujours, un bandeau explique comment le couper. */
+function darkTip() {
+  var K = "qpk-astuce-sombre";
+  if (lsGet(K)) return;
+  var samsung = /SamsungBrowser/i.test(navigator.userAgent || "");
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (!samsung || !dark || param("ecran") === "1") return;
+  var el = document.createElement("div");
+  el.className = "dark-tip"; el.setAttribute("role", "note");
+  el.innerHTML = "<div><b>Couleurs bizarres ?</b> Samsung Internet assombrit le jeu. Pour retrouver les vraies couleurs, ouvre le menu ≡ en bas à droite et coupe le <b>Mode sombre</b>. Tu peux aussi ouvrir le jeu avec Chrome.</div>" +
+    '<button type="button" class="mini">Compris</button>';
+  document.body.appendChild(el);
+  el.querySelector("button").onclick = function () { lsSet(K, 1); el.parentNode.removeChild(el); };
+}
 /* Après le chargement de tous les scripts de la page (badges.js compris). */
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { footer(); splash(false); });
-else { footer(); splash(false); }
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { footer(); darkTip(); splash(false); });
+else { footer(); darkTip(); splash(false); }
 
 return {
   VERSION: VERSION, CATS: CATS, CAT_IDS: CAT_IDS, COLOR: COLOR, TXT: TXT, KEY: KEY, NOW: NOW, DEMO: DEMO, reduced: reduced,

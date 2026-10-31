@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.4.2
+   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page du maître du jeu : crée la partie, tire les cartes, voit la réponse attendue.
    Les joueurs répondent avant la fin du chrono. Le maître du jeu valide ou refuse chaque réponse.
@@ -285,6 +285,7 @@ setInterval(function () {
   if (!P || P.etat !== "jeu" || !P.carte) return;
   var up = Q.paintTimer(P.carte);
   if (P.carte.etat === "ouverte" && up) closeCard();
+  paintCountdowns();
 }, 200);
 
 /* ---------- jeu ---------- */
@@ -294,20 +295,29 @@ function answers() {
 }
 function verdictOf(uid) {
   var c = P.carte, r = answers()[uid], V = c && P.verdicts && P.verdicts[c.id] ? P.verdicts[c.id] : {};
-  return r && V[uid] && V[uid].v === r.v ? V[uid].ok : null;
+  if (!(r && V[uid] && V[uid].v === r.v)) return null;
+  return V[uid].more ? "more" : V[uid].ok;
 }
+/* Délai personnel accordé par « Mais encore ? » (heure du serveur, en ms). */
+var MORE_S = 30;
+function plusOf(uid) { var c = P.carte; return c && c.plus && c.plus[uid] ? c.plus[uid] : 0; }
 function answerRows() {
   var c = P.carte, R = answers(), revealed = c.etat === "revelee", open = c.etat === "ouverte";
   var list = Q.playerList(P).filter(function (p) { return !p.parti || R[p.uid]; });
   if (!list.length) return '<p class="note">Aucun joueur dans la partie.</p>';
   return '<ul class="answers">' + list.map(function (p) {
     var r = R[p.uid], v = verdictOf(p.uid), okRev = revealed && c.ok && c.ok[p.uid];
-    var state = revealed ? (r ? (okRev ? "ok" : "ko") : "none") : (v === true ? "ok" : v === false ? "ko" : r ? "todo" : "none");
+    var state = revealed ? (r ? (okRev ? "ok" : "ko") : "none") : (v === true ? "ok" : v === false ? "ko" : v === "more" ? "more" : r ? "todo" : "none");
     var txt = r ? esc(r.txt) : '<em>' + (open ? "en train de répondre…" : "pas de réponse") + "</em>";
-    var btns = r && !revealed ? '<span class="judge"><button type="button" class="j-ok" data-ok="' + esc(p.uid) + '" aria-pressed="' + (v === true) + '" aria-label="Valider la réponse de ' + esc(p.nom) + '">✓</button>' +
-      '<button type="button" class="j-ko" data-ko="' + esc(p.uid) + '" aria-pressed="' + (v === false) + '" aria-label="Refuser la réponse de ' + esc(p.nom) + '">✗</button></span>'
+    var u = esc(p.uid), n = esc(p.nom);
+    var btns = r && !revealed ? '<span class="judge" role="group" aria-label="Correction de ' + n + '">' +
+      '<button type="button" class="j-ok" data-ok="' + u + '" aria-pressed="' + (v === true) + '" title="Oui" aria-label="Oui : réponse juste de ' + n + '">✓</button>' +
+      '<button type="button" class="j-more" data-more="' + u + '" aria-pressed="' + (v === "more") + '" title="Mais encore ?" aria-label="Mais encore ? Demander à ' + n + ' d\'être plus précis">?</button>' +
+      '<button type="button" class="j-ko" data-ko="' + u + '" aria-pressed="' + (v === false) + '" title="Non" aria-label="Non : réponse fausse de ' + n + '">✗</button></span>'
       : revealed && r ? '<span class="res ' + state + '">' + (okRev ? "✓ juste" : "✗") + "</span>" : "";
-    return '<li class="ans ' + state + (p.enLigne ? "" : " off") + '"><span class="an">' + esc(p.nom) + (r && r.v > 1 && open ? ' <small>modifiée</small>' : "") + '</span><span class="at">' + txt + "</span>" + btns + "</li>";
+    var tag = !revealed && r && r.v > 1 ? (plusOf(p.uid) ? "complétée" : open ? "modifiée" : "") : "";
+    var cd = v === "more" ? '<small class="more-note">précision demandée · <span class="cd" data-until="' + plusOf(p.uid) + '"></span></small>' : "";
+    return '<li class="ans ' + state + (p.enLigne ? "" : " off") + '"><span class="an">' + n + (tag ? " <small>" + tag + "</small>" : "") + cd + '</span><span class="at">' + txt + "</span>" + btns + "</li>";
   }).join("") + "</ul>";
 }
 function renderGame() {
@@ -315,7 +325,7 @@ function renderGame() {
   var c = P.carte, q = currentQ(), revealed = c && c.etat === "revelee", open = c && c.etat === "ouverte", closed = c && c.etat === "fermee";
   var act = Q.activeList(P), R = c ? answers() : {};
   var nRep = act.filter(function (p) { return R[p.uid]; }).length;
-  var todo = c ? act.filter(function (p) { return R[p.uid] && verdictOf(p.uid) === null; }).length : 0;
+  var todo = c ? act.filter(function (p) { var v = verdictOf(p.uid); return R[p.uid] && (v === null || v === "more"); }).length : 0;
   var newCard = c && c.id !== lastCard, flipNow = c && revealed && lastEtat !== "revelee" && lastEtat !== null && !newCard;
   var src = q && q.s ? (q.u ? '<a href="' + esc(q.u) + '" target="_blank" rel="noopener">' + esc(q.s) + "</a>" : esc(q.s)) : "";
 
@@ -341,10 +351,10 @@ function renderGame() {
       : revealed ? '<button class="primary" type="button" id="btnDraw">Carte suivante</button>'
       : closed ? '<button class="primary" type="button" id="btnReveal">Révéler la réponse</button><button class="ghost" type="button" id="btnSkip">Passer sans révéler</button>'
       : '<button class="ghost" type="button" id="btnMore">+15 s</button><button class="ghost" type="button" id="btnClose">Clore maintenant</button><button class="ghost" type="button" id="btnSkip">Passer cette carte</button>') + "</div>" +
-    (closed && todo ? '<p class="mj-hint">' + todo + " réponse" + (todo > 1 ? "s" : "") + " pas encore corrigée" + (todo > 1 ? "s" : "") + ". Elle" + (todo > 1 ? "s" : "") + " compteront fausse" + (todo > 1 ? "s" : "") + " si vous révélez maintenant.</p>" : "") +
+    (closed && todo ? '<p class="mj-hint">' + todo + " réponse" + (todo > 1 ? "s" : "") + " pas encore corrigée" + (todo > 1 ? "s" : "") + (todo > 1 ? ". Elles compteront fausses" : ". Elle comptera fausse") + " si vous révélez maintenant. Une précision demandée compte aussi tant qu'elle n'est pas validée.</p>" : "") +
     "</div>" +
     '<div class="mj-col"><div class="pile-head"><h3>Réponses des joueurs</h3><span class="n">' + (c ? nRep + " / " + act.length + " ont répondu" : "") + "</span></div>" +
-    (c ? (open ? '<p class="mj-hint light">Vous pouvez corriger pendant le temps de réponse. Si un joueur modifie sa réponse, elle repasse à corriger.</p>' : "") + answerRows()
+    (c ? (open ? '<p class="mj-hint light">Vous pouvez corriger pendant le temps de réponse. ✓ oui. ? mais encore : le joueur précise sa réponse. ✗ non : le joueur le voit et peut la corriger avant la fin du chrono. Une réponse modifiée repasse à corriger.</p>' : "") + answerRows()
       : '<div class="pile"><div class="pile-empty">Les réponses des joueurs arriveront ici.</div></div>') +
     "</div></div>";
   flash = "";
@@ -370,6 +380,8 @@ function renderGame() {
   var cl = byId("btnClose"); if (cl) cl.onclick = closeCard;
   Array.prototype.forEach.call(app.querySelectorAll("[data-ok]"), function (b) { b.onclick = function () { judge(b.dataset.ok, true); }; });
   Array.prototype.forEach.call(app.querySelectorAll("[data-ko]"), function (b) { b.onclick = function () { judge(b.dataset.ko, false); }; });
+  Array.prototype.forEach.call(app.querySelectorAll("[data-more]"), function (b) { b.onclick = function () { judge(b.dataset.more, "more"); }; });
+  paintCountdowns();
   Q.syncBoard(P, true, function (v) {
     partyRef.update({ affichage: v === "close" ? null : v === "tous" ? { mode: "tous" } : { mode: "joueur", uid: v } }).catch(fail);
   });
@@ -382,8 +394,20 @@ function celebrate(c) {
 function judge(u, ok) {
   var c = P.carte, r = answers()[u];
   if (!c || !r || c.etat === "revelee") return;
-  var cur = verdictOf(u);
-  db.ref(path("verdicts/" + c.id + "/" + u)).set(cur === ok ? null : { v: r.v, ok: ok }).catch(fail);
+  var cur = verdictOf(u), upd = {};
+  if (cur === ok) upd["verdicts/" + c.id + "/" + u] = null;
+  else upd["verdicts/" + c.id + "/" + u] = ok === "more" ? { v: r.v, ok: false, more: true } : { v: r.v, ok: ok };
+  // « Mais encore ? » : le joueur a 30 s pour compléter, même si le chrono de la carte est fini.
+  if (ok === "more" && cur !== "more") upd["carte/plus/" + u] = Math.max(Q.now() + MORE_S * 1000, c.etat === "ouverte" ? c.fin || 0 : 0);
+  else if (cur === "more") upd["carte/plus/" + u] = null;
+  partyRef.update(upd).catch(fail);
+}
+/* Compte à rebours des « Mais encore ? » dans la liste des réponses. */
+function paintCountdowns() {
+  Array.prototype.forEach.call(app.querySelectorAll(".cd[data-until]"), function (el) {
+    var left = (+el.dataset.until || 0) - Q.now();
+    el.textContent = left > 0 ? Q.fmt(left) : "temps écoulé";
+  });
 }
 function reveal() {
   if (busy || !P.carte) return;

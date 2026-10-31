@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.4.2
+   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 
 /* Layout: plein écran sur le fond fourni ; carte au centre, commandes du maître du jeu dessous, camemberts des joueurs en bas. */
@@ -514,7 +514,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outli
 .panel .board-box { max-height: none; overflow: visible; box-shadow: none; margin: 4px 0 18px; }
 .timer.up .tbar i { transition: none; }
 
-/* =================== v1.4.2 : page de démarrage =================== */
+/* =================== v1.5.1 : page de démarrage =================== */
 .splash { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80; overflow: auto; padding: 16px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
   background: rgba(20, 28, 80, .55) url("fond.png") center / cover no-repeat; background-blend-mode: multiply; transition: opacity .3s; }
@@ -570,3 +570,20 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outli
 .copy-foot { text-align: center; color: #fff; font-size: 12.5px; padding: 6px 16px 18px; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
 .copy-foot .linkish { color: #FFF3B5; font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .splash, .sp-card, .sp-c { animation: none !important; transition: none !important; } }
+
+/* =================== v1.5.1 : feu tricolore « Mais encore ? » =================== */
+.judge .j-more { border-color: #E39A00; color: #8A5A00; font-size: 24px; }
+.judge .j-more[aria-pressed="true"] { background: #F2A900; color: #1F2440; border-color: #F2A900; }
+.ans.more { border-color: #F2A900; background: #FFF8E6; }
+.ans .more-note { display: block; font-weight: 700; font-size: 11.5px; color: #8A5A00; margin-top: 2px; }
+.feedback.more { background: #FFF1CC; color: #6B4700; border: 2px solid #F2A900; animation: shake .4s; }
+@media (prefers-reduced-motion: reduce) { .feedback.more { animation: none !important; } }
+@media (max-width: 560px) { .judge button { width: 44px; height: 44px; } }
+
+/* Le site garde ses propres couleurs, même quand le téléphone est en mode sombre. */
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
+textarea, input, select { color: var(--ink); }
+.dark-tip { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 70; display: flex; gap: 12px; align-items: center;
+  background: #FFF6D6; color: #3B2A00; border: 2px solid var(--sun); border-radius: 18px; padding: 12px 14px; font-size: 14px; line-height: 1.4;
+  box-shadow: 0 10px 30px rgba(10,20,80,.4); }
+.dark-tip .mini { flex: none; }
