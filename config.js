@@ -9,13 +9,13 @@
 
 // ▼▼▼ Remplacez tout ce bloc par celui copié dans la console Firebase ▼▼▼
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyA9a68ALEYEVbF9D-0ZODm-eA554jEib1Q",
+  authDomain: "question-pour-un-kine.firebaseapp.com",
+  databaseURL: "https://question-pour-un-kine-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "question-pour-un-kine",
+  storageBucket: "question-pour-un-kine.firebasestorage.app",
+  messagingSenderId: "369438859710",
+  appId: "1:369438859710:web:60b9713cf64b5ca7c659ef"
 };
 // ▲▲▲ Fin du bloc à remplacer ▲▲▲
 
