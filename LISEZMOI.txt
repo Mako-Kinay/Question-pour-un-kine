@@ -1,0 +1,23 @@
+Question pour un kiné – mode multijoueur (v1.4.2)
+==================================================
+
+Ce dossier est le site complet. On le dépose tel quel sur GitHub Pages.
+
+Pages
+- index.html   : accueil (choisir maître du jeu ou joueur)
+- hote.html    : maître du jeu (sur ordinateur)
+- joueur.html  : joueur (sur téléphone). Avec ?ecran=1 : écran à projeter
+
+À modifier par vous
+- config.js    : collez-y la configuration de votre projet Firebase (étape 4 du guide)
+
+À copier dans Firebase
+- regles-firebase.json : règles de sécurité de la base (étape 5 du guide)
+
+Tant que config.js est vide, le jeu fonctionne en mode démo :
+la partie se joue entre les onglets d'un même navigateur.
+Pratique pour essayer avant de configurer Firebase.
+
+Les autres fichiers (style, scripts, images, questions, badges) ne se modifient pas.
+badges.js contient les dessins des 33 badges (11 catégories, 3 niveaux).
+LICENCE.txt précise les droits d'auteur : tous droits réservés.

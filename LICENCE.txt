@@ -1,0 +1,42 @@
+QUESTION POUR UN KINÉ – VERSION PÉDIATRIQUE
+Mode multijoueur v1.4.2
+
+© 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
+
+
+CE QUE COUVRE CE DROIT D'AUTEUR
+
+Tout le contenu de ce dossier et du site qui en est issu :
+- le code (pages, scripts, styles, générateur de QR code).
+- la banque de questions et de réponses (questions.js).
+- les badges écureuil (badges.js).
+- les images (logo, fond, carte, phrase).
+
+Ce dossier n'est pas un logiciel libre.
+Aucune licence n'est accordée.
+
+
+CE QUI EST INTERDIT SANS ACCORD ÉCRIT DE L'AUTEUR
+
+- Reproduire ou copier le jeu, en tout ou en partie.
+- Le diffuser ou l'héberger ailleurs.
+- Le modifier ou en tirer une autre version.
+- L'utiliser dans un cadre commercial, y compris une formation payante.
+
+
+CE QUI EST PERMIS
+
+- Jouer au jeu en ligne, à l'invitation de l'auteur ou d'un maître du jeu autorisé.
+- Consulter le code sur GitHub, dans la limite prévue par les conditions d'utilisation de GitHub.
+
+
+ÉLÉMENTS EXTÉRIEURS
+
+- Polices Fredoka et Patrick Hand : Google Fonts, sous licence SIL Open Font License.
+- Firebase (Google) : service de base de données en temps réel, chargé depuis les serveurs de Google.
+- Les sources scientifiques citées dans les réponses restent la propriété de leurs auteurs.
+
+
+CONTACT
+
+Pour toute demande d'utilisation : Maxime KOSMALA, MKDE.

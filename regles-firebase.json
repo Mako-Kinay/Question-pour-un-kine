@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "parties": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('hote').val() === auth.uid) || data.child('hote').val() === auth.uid)",
+        "joueurs": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).exists()",
+            ".validate": "newData.child('nom').isString() && newData.child('nom').val().length >= 1 && newData.child('nom').val().length <= 18"
+          }
+        },
+        "reponses": {
+          "$cid": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000",
+              ".validate": "newData.child('txt').isString() && newData.child('txt').val().length <= 500 && newData.child('v').isNumber() && newData.child('ts').val() === now"
+            }
+          }
+        }
+      }
+    }
+  }
+}
