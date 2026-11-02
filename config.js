@@ -9,14 +9,14 @@
 
 // ▼▼▼ Remplacez tout ce bloc par celui copié dans la console Firebase ▼▼▼
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+  apiKey: "AIzaSyCSlmxuzeHbw2fzy5IJtcVhXj-isdDoM9w",
+  authDomain: "qpuk-9417e.firebaseapp.com",
+  databaseURL: "https://qpuk-9417e-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "qpuk-9417e",
+  storageBucket: "qpuk-9417e.firebasestorage.app",
+  messagingSenderId: "1008129366283",
+  appId: "1:1008129366283:web:8a1547a1596e2cbbe1ea0e"
+}
 // ▲▲▲ Fin du bloc à remplacer ▲▲▲
 
 window.QPK_FIREBASE = firebaseConfig;
