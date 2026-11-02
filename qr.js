@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Générateur de QR code autonome (mode octet, correction M, versions 1 à 10).
    Écrit pour ce jeu afin de ne dépendre d'aucun service extérieur.

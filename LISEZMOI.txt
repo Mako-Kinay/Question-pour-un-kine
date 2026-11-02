@@ -1,11 +1,11 @@
-Question pour un kiné – mode multijoueur (v1.5.1)
+Question pour un kiné – mode multijoueur (v1.7.0)
 ==================================================
 
 Ce dossier est le site complet. On le dépose tel quel sur GitHub Pages.
 
 Pages
 - index.html   : accueil (choisir maître du jeu ou joueur)
-- hote.html    : maître du jeu (sur ordinateur)
+- hote.html    : maître du jeu (sur ordinateur), avec connexion par e-mail et mot de passe
 - joueur.html  : joueur (sur téléphone). Avec ?ecran=1 : écran à projeter
 
 À modifier par vous
@@ -21,3 +21,5 @@ Pratique pour essayer avant de configurer Firebase.
 Les autres fichiers (style, scripts, images, questions, badges) ne se modifient pas.
 badges.js contient les dessins des 33 badges (11 catégories, 3 niveaux).
 LICENCE.txt précise les droits d'auteur : tous droits réservés.
+police-fredoka.woff et police-patrick-hand.woff : les polices du jeu, hébergées avec le site.
+LICENCE-polices-OFL.txt : la licence libre de ces deux polices.

@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.4.2
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* ================================================================
    Configuration Firebase (voir le guide, étape 4).
@@ -9,14 +9,18 @@
 
 // ▼▼▼ Remplacez tout ce bloc par celui copié dans la console Firebase ▼▼▼
 const firebaseConfig = {
-  apiKey: "AIzaSyA9a68ALEYEVbF9D-0ZODm-eA554jEib1Q",
-  authDomain: "question-pour-un-kine.firebaseapp.com",
-  databaseURL: "https://question-pour-un-kine-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "question-pour-un-kine",
-  storageBucket: "question-pour-un-kine.firebasestorage.app",
-  messagingSenderId: "369438859710",
-  appId: "1:369438859710:web:60b9713cf64b5ca7c659ef"
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
 };
 // ▲▲▲ Fin du bloc à remplacer ▲▲▲
 
 window.QPK_FIREBASE = firebaseConfig;
+
+// Facultatif : App Check (voir le guide, partie « Pour aller plus loin »).
+// Colle ici la clé de site reCAPTCHA v3 entre les guillemets. Laisse vide pour ne pas l'utiliser.
+window.QPK_APPCHECK_CLE = "";

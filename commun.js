@@ -1,12 +1,12 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Question pour un kiné – multijoueur : outils communs au maître du jeu, aux joueurs et à l'écran projeté.
    - Connexion : Firebase (si config.js est rempli) ou mode démo (onglets d'un même navigateur).
    - Visuels : catégories, badges, cartes, bannières, confettis, chrono. */
 window.QPK = (function () {
 "use strict";
-var VERSION = "Multijoueur v1.5.1";
+var VERSION = "Multijoueur v1.7.0";
 var CATS = [
   { id: "Développement", color: "#1E9E54", text: "#FFFFFF" },
   { id: "Neurologie", color: "#2457D6", text: "#FFFFFF" },
@@ -33,6 +33,8 @@ function esc(s) {
   });
 }
 function byId(id) { return document.getElementById(id); }
+/* Lien de source : seulement http:// ou https://, sinon rien (protège des liens « javascript: »). */
+function lienSur(u) { u = String(u == null ? "" : u).trim(); return /^https?:\/\/[^\s]+$/i.test(u) ? u : ""; }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, reduced ? Math.min(ms, 150) : ms); }); }
 function ordinal(n) { return n === 1 ? "1er" : n + "e"; }
 function lsGet(k, store) { try { var r = (store || localStorage).getItem(k); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
@@ -46,12 +48,13 @@ function param(name) {
 function cleanCode(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
 function newCode() {
   var abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = "";   // sans I, O, 0, 1 : pas de confusion à l'oral
-  for (var i = 0; i < 4; i++) s += abc.charAt(Math.floor(Math.random() * abc.length));
+  for (var i = 0; i < 5; i++) s += abc.charAt(Math.floor(Math.random() * abc.length));   // 5 caractères : environ 33 millions de codes
   return s;
 }
 
 /* ====================== Connexion ====================== */
 var CFG = window.QPK_FIREBASE || {};
+var APPCHECK = String(window.QPK_APPCHECK_CLE || "").trim();
 var DEMO = param("demo") === "1" || !CFG.apiKey || !CFG.databaseURL;
 
 /* --- Base de démonstration : même interface que Firebase, stockée dans le navigateur.
@@ -60,7 +63,7 @@ var LocalDB = (function () {
   var K = "qpk-demo-base", listeners = [], chan = null;
   try { chan = new BroadcastChannel("qpk-demo"); chan.onmessage = function () { notify(); }; } catch (e) {}
   function readAll() { try { return JSON.parse(localStorage.getItem(K)) || {}; } catch (e) { return {}; } }
-  function parts(p) { return String(p).split("/").filter(Boolean); }
+  function parts(p) { return String(p == null ? "" : p).split("/").filter(Boolean); }
   function getAt(t, p) {
     var o = t;
     parts(p).forEach(function (k) { o = o && typeof o === "object" ? o[k] : undefined; });
@@ -159,17 +162,23 @@ function connect(role) {
   return loadScript(FB + "firebase-app-compat.js")
     .then(function () { return loadScript(FB + "firebase-auth-compat.js"); })
     .then(function () { return loadScript(FB + "firebase-database-compat.js"); })
+    .then(function () { return APPCHECK ? loadScript(FB + "firebase-app-check-compat.js") : null; })
     .then(function () {
       // Une « appli » Firebase par rôle : le maître du jeu et un joueur ouverts sur le même ordinateur gardent des identités séparées.
       var app = firebase.initializeApp(CFG, role);
+      // App Check (facultatif) : si une clé reCAPTCHA v3 est donnée dans config.js, Firebase vérifie que les demandes viennent du site.
+      if (APPCHECK) { try { (app.appCheck ? app.appCheck() : firebase.appCheck(app)).activate(APPCHECK, true); } catch (e) {} }
       var auth = app.auth();
       var pers = role === "hote" ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
       return auth.setPersistence(pers).then(function () {
         // On attend que Firebase ait relu l'identité enregistrée avant d'en créer une nouvelle (sinon le maître du jeu perdrait sa partie au rechargement).
         return new Promise(function (res) { var stop = auth.onAuthStateChanged(function (u) { stop(); res(u); }); });
       }).then(function (u) {
-        return u ? u : auth.signInAnonymously().then(function (c) { return c.user; });
-      }).then(function (user) { var d = app.database(); followClock(d); return { db: d, uid: user.uid, demo: false }; });
+        var d = app.database(); followClock(d);
+        // Le maître du jeu se connecte avec son compte (e-mail et mot de passe), jamais en anonyme.
+        if (role === "hote") return { db: d, uid: u && !u.isAnonymous ? u.uid : null, user: u && !u.isAnonymous ? u : null, auth: auth, demo: false };
+        return (u ? Promise.resolve(u) : auth.signInAnonymously().then(function (c) { return c.user; })).then(function (user) { return { db: d, uid: user.uid, demo: false }; });
+      });
     })
     .catch(function (e) {
       var msg = String((e && (e.code || e.message)) || e);
@@ -177,6 +186,15 @@ function connect(role) {
       else if (/network|charger/i.test(msg)) msg = "Pas de connexion internet, ou le réseau bloque Firebase.";
       throw new Error(msg);
     });
+}
+function authError(e) {
+  var m = String((e && (e.code || e.message)) || e);
+  if (/invalid-credential|wrong-password|user-not-found|invalid-login|invalid-email/.test(m)) return "E-mail ou mot de passe incorrect.";
+  if (/too-many-requests/.test(m)) return "Trop d'essais. Attends quelques minutes avant de réessayer.";
+  if (/operation-not-allowed/.test(m)) return "La connexion par e-mail n'est pas activée dans Firebase (Authentication > Méthode de connexion > Adresse e-mail/Mot de passe).";
+  if (/user-disabled/.test(m)) return "Ce compte est désactivé dans Firebase.";
+  if (/network/.test(m)) return "Pas de connexion internet, ou le réseau bloque Firebase.";
+  return m;
 }
 function permError(e) {
   var m = String((e && (e.code || e.message)) || e);
@@ -544,7 +562,7 @@ function demoBanner() {
   return '<div class="demo-note"><strong>Mode démo.</strong> La partie ne passe pas par internet : elle se joue entre les onglets de ce navigateur, sur cet ordinateur. Pour jouer avec des téléphones, remplissez config.js (voir le guide).</div>';
 }
 
-/* ====================== Page de démarrage et mentions (v1.5.1) ====================== */
+/* ====================== Page de démarrage et mentions (v1.7.0) ====================== */
 var AUTEUR = "Maxime KOSMALA, MKDE", ANNEE = "2026";
 function splashHTML() {
   // Trois badges tirés au hasard : bronze, or au centre, argent.
@@ -633,8 +651,8 @@ else { footer(); darkTip(); splash(false); }
 
 return {
   VERSION: VERSION, CATS: CATS, CAT_IDS: CAT_IDS, COLOR: COLOR, TXT: TXT, KEY: KEY, NOW: NOW, DEMO: DEMO, reduced: reduced,
-  esc: esc, byId: byId, sleep: sleep, ordinal: ordinal, lsGet: lsGet, lsSet: lsSet, param: param, cleanCode: cleanCode, newCode: newCode,
-  connect: connect, permError: permError, pieSVG: pieSVG, countOwned: countOwned, cardFace: cardFace, brand: brand,
+  esc: esc, byId: byId, lienSur: lienSur, sleep: sleep, ordinal: ordinal, lsGet: lsGet, lsSet: lsSet, param: param, cleanCode: cleanCode, newCode: newCode,
+  connect: connect, permError: permError, authError: authError, pieSVG: pieSVG, countOwned: countOwned, cardFace: cardFace, brand: brand,
   fitCards: fitCards, autoFit: autoFit, showBanner: showBanner, confetti: confetti, armButton: armButton,
   playerList: playerList, activeList: activeList, ranking: ranking, ranks: ranks, rankingHTML: rankingHTML, bilanHTML: bilanHTML,
   NIV: NIV, badge: badge, nick: nick, shortName: shortName, bonnes: bonnes, level: level, totalLevels: totalLevels, totalBonnes: totalBonnes, nbOr: nbOr, miniBadges: miniBadges,

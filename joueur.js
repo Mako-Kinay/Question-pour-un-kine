@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page joueur : rejoindre une partie, voir la question, répondre avant la fin du chrono, voir ses badges.
    Avec ?ecran=1, la même page sert d'écran à projeter (question, chrono, réponse révélée,
@@ -42,7 +42,7 @@ function renderJoin(msg) {
   byId("fJoin").onsubmit = function (e) {
     e.preventDefault();
     var c = Q.cleanCode(byId("inCode").value);
-    if (c.length < 4) { renderJoin("Le code fait 4 caractères. Il est affiché chez le maître du jeu."); return; }
+    if (c.length < 4) { renderJoin("Le code fait 5 caractères. Il est affiché chez le maître du jeu."); return; }
     if (ECRAN) { code = c; subscribe(); return; }
     var nom = inNom.value.trim().replace(/\s+/g, " ").slice(0, 18);
     if (!nom) { code = c; renderJoin("Indique ton prénom ou un pseudo."); return; }
@@ -55,6 +55,9 @@ function join(c, nom, silent) {
     var v = s.val();
     if (!v) { Q.lsSet(K_ME, null, sessionStorage); saved = {}; renderJoin(silent ? "" : "Aucune partie avec le code « " + c + " ». Vérifie le code auprès du maître du jeu."); return; }
     var me = v.joueurs && v.joueurs[uid];
+    // Un nouveau joueur ne peut pas entrer si les inscriptions sont fermées, ou si la partie a plus de 24 h.
+    if (!me && v.ferme) { renderJoin("Les inscriptions sont fermées. Demande au maître du jeu."); return; }
+    if (!me && typeof v.cree === "number" && Q.now() - v.cree > 24 * 3600 * 1000) { renderJoin("Cette partie a plus de 24 h. Demande un nouveau code au maître du jeu."); return; }
     var jref = db.ref("parties/" + c + "/joueurs/" + uid);
     return jref.update({ nom: nom, enLigne: true, parti: null, t: me && me.t ? me.t : Q.NOW }).then(function () {
       saved = { code: c, nom: nom }; Q.lsSet(K_ME, saved, sessionStorage);
@@ -62,7 +65,10 @@ function join(c, nom, silent) {
       presence();
       subscribe();
     });
-  }).catch(function (e) { renderJoin(Q.permError(e)); });
+  }).catch(function (e) {
+    var perm = /permission/i.test(String(e && (e.code || e.message)));
+    renderJoin(perm ? "Impossible d'entrer : les inscriptions sont peut-être fermées. Demande au maître du jeu." : Q.permError(e));
+  });
 }
 /* Présence : « hors ligne » quand le téléphone se déconnecte, « en ligne » à la reconnexion. */
 function presence() {
@@ -79,6 +85,7 @@ function subscribe() {
   partyRef.on("value", function (s) { P = s.val(); render(); }, function (e) { renderJoin(Q.permError(e)); });
 }
 function quit() {
+  watchCard(null);
   joined = false; Q.lsSet(K_ME, null, sessionStorage); saved = {};
   var upd = P && P.etat === "lobby" ? null : { parti: true, enLigne: false };
   var ref = db.ref("parties/" + code + "/joueurs/" + uid);
@@ -99,6 +106,7 @@ function keyOf() {
 }
 function render() {
   var k = keyOf();
+  if (!ECRAN && joined) watchCard(P && P.etat === "jeu" && P.carte ? P.carte.id : null);
   if (k !== screenKey) {
     screenKey = k; lastFb = null;
     if (k === "gone") return renderGone();
@@ -111,6 +119,7 @@ function render() {
   update();
 }
 function renderGone() {
+  watchCard(null);
   if (partyRef) partyRef.off("value");
   Q.syncBoard(null, false);
   Q.lsSet(K_ME, null, sessionStorage);
@@ -173,19 +182,29 @@ function renderCard() {
   Q.paintTimer(c);
 }
 
-function mine() {
-  var c = P.carte, R = (P.reponses && P.reponses[c.id]) || {};
-  return R[uid] || null;
+/* Ma réponse et la correction du maître du jeu pour la carte en cours.
+   Elles sont rangées hors de la partie : un joueur ne peut lire que les siennes. */
+var MYR = null, MYV = null, myRefs = [], watchedCard = null;
+function watchCard(cid) {
+  if (ECRAN || watchedCard === cid) return;
+  myRefs.forEach(function (r) { r.off("value"); });
+  myRefs = []; MYR = null; MYV = null; watchedCard = cid;
+  if (!cid) return;
+  var r1 = db.ref("reponses/" + code + "/" + cid + "/" + uid), r2 = db.ref("retours/" + code + "/" + cid + "/" + uid);
+  r1.on("value", function (s) { MYR = s.val(); if (P) update(); }, function () {});
+  r2.on("value", function (s) { MYV = s.val(); if (P) update(); }, function () {});
+  myRefs = [r1, r2];
 }
+function mine() { return MYR || null; }
 /* « Mais encore ? » : le maître du jeu demande plus de précision sur la version envoyée. */
 function askedMore() {
-  var c = P.carte, r = mine(), V = (P.verdicts && P.verdicts[c.id]) || {};
-  return !!(r && V[uid] && V[uid].v === r.v && V[uid].more);
+  var r = mine(), V = MYV;
+  return !!(r && V && V.v === r.v && V.more);
 }
 /* « Non » du maître du jeu sur la version envoyée. */
 function refused() {
-  var c = P.carte, r = mine(), V = (P.verdicts && P.verdicts[c.id]) || {};
-  return !!(r && V[uid] && V[uid].v === r.v && V[uid].ok === false && !V[uid].more);
+  var r = mine(), V = MYV;
+  return !!(r && V && V.v === r.v && V.ok === false && !V.more);
 }
 function myPlus() { var c = P.carte; return c && c.plus && c.plus[uid] ? c.plus[uid] : 0; }
 /* Peut-on encore envoyer ? Chrono de la carte, ou délai personnel accordé par « Mais encore ? ». */
@@ -212,7 +231,7 @@ function update() {
   var c = P.carte;
   var st = byId("status");
   if (st) {
-    var R = (P.reponses && P.reponses[c.id]) || {}, act = Q.activeList(P);
+    var R = (P.envoyes && P.envoyes[c.id]) || {}, act = Q.activeList(P);
     st.innerHTML = '<div class="st-row">' + act.map(function (p) {
       var cls = c.etat === "revelee" ? (c.ok && c.ok[p.uid] ? "ok" : R[p.uid] ? "ko" : "") : R[p.uid] ? "sent" : "";
       return '<span class="st-chip ' + cls + (p.enLigne ? "" : " off") + '">' + esc(p.nom) + (cls === "ok" ? " ✓" : cls === "sent" ? " ·" : "") + "</span>";
@@ -237,7 +256,8 @@ function showAnswer() {
   Q.fitCards(app);
   card.classList.remove("enter");
   requestAnimationFrame(function () { requestAnimationFrame(function () { card.classList.add("flipped"); }); });
-  if (c.s) byId("source").innerHTML = "Source : " + (c.u ? '<a href="' + esc(c.u) + '" target="_blank" rel="noopener">' + esc(c.s) + "</a>" : esc(c.s));
+  var cu = Q.lienSur(c.u);
+  if (c.s) byId("source").innerHTML = "Source : " + (cu ? '<a href="' + esc(cu) + '" target="_blank" rel="noopener noreferrer">' + esc(c.s) + "</a>" : esc(c.s));
   if (celebrated[c.id]) return;
   celebrated[c.id] = true;
   setTimeout(function () {
@@ -301,7 +321,10 @@ function send() {
   var txt = ta.value.trim().slice(0, 500), r = mine();
   if (!txt || (r && String(r.txt).trim() === txt)) return;
   sending = true; updateForm();
-  db.ref("parties/" + code + "/reponses/" + c.id + "/" + uid).set({ txt: txt, ts: Q.NOW, v: (r ? r.v : 0) + 1 })
+  var all = {};
+  all["reponses/" + code + "/" + c.id + "/" + uid] = { txt: txt, ts: Q.NOW, v: Math.min(1000, (r ? r.v : 0) + 1) };
+  all["parties/" + code + "/envoyes/" + c.id + "/" + uid] = true;
+  db.ref().update(all)
     .then(function () { sending = false; updateForm(); })
     .catch(function (e) {
       sending = false; updateForm();

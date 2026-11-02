@@ -1,8 +1,11 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 
 /* Layout: plein écran sur le fond fourni ; carte au centre, commandes du maître du jeu dessous, camemberts des joueurs en bas. */
+/* Polices hébergées avec le jeu (licence SIL OFL, voir LICENCE-polices-OFL.txt). Aucune connexion à Google Fonts. */
+@font-face { font-family: "Fredoka"; src: url("police-fredoka.woff") format("woff"); font-weight: 500 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Patrick Hand"; src: url("police-patrick-hand.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
 :root {
   color-scheme: light;
   --sky: #5170FF;        /* bleu du fond */
@@ -514,7 +517,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outli
 .panel .board-box { max-height: none; overflow: visible; box-shadow: none; margin: 4px 0 18px; }
 .timer.up .tbar i { transition: none; }
 
-/* =================== v1.5.1 : page de démarrage =================== */
+/* =================== v1.7.0 : page de démarrage =================== */
 .splash { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80; overflow: auto; padding: 16px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
   background: rgba(20, 28, 80, .55) url("fond.png") center / cover no-repeat; background-blend-mode: multiply; transition: opacity .3s; }
@@ -571,7 +574,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outli
 .copy-foot .linkish { color: #FFF3B5; font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .splash, .sp-card, .sp-c { animation: none !important; transition: none !important; } }
 
-/* =================== v1.5.1 : feu tricolore « Mais encore ? » =================== */
+/* =================== v1.7.0 : feu tricolore « Mais encore ? » =================== */
 .judge .j-more { border-color: #E39A00; color: #8A5A00; font-size: 24px; }
 .judge .j-more[aria-pressed="true"] { background: #F2A900; color: #1F2440; border-color: #F2A900; }
 .ans.more { border-color: #F2A900; background: #FFF8E6; }
@@ -587,3 +590,15 @@ textarea, input, select { color: var(--ink); }
   background: #FFF6D6; color: #3B2A00; border: 2px solid var(--sun); border-radius: 18px; padding: 12px 14px; font-size: 14px; line-height: 1.4;
   box-shadow: 0 10px 30px rgba(10,20,80,.4); }
 .dark-tip .mini { flex: none; }
+
+/* =================== v1.7.0 : connexion du maître du jeu =================== */
+.panel.narrow { width: min(520px, 100%); }
+.account-line { margin: -4px 0 14px; font-size: 14px; color: var(--muted); text-align: right; }
+.account-line b { color: var(--ink); }
+.uid-box { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #fff; border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.uid-box code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 15px; font-weight: 700; color: var(--sky-deep); }
+label.field-label { display: block; }
+
+/* =================== v1.7.0 : sécurité =================== */
+.ghost.danger { border-color: #B42318; color: #B42318; }
+.mini.locked { background: #FDE2E1; border-color: #E3A3AA; color: #8E1626; }

@@ -1,20 +1,155 @@
 {
   "rules": {
+    "mj": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
     "parties": {
       "$code": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('hote').val() === auth.uid) || data.child('hote').val() === auth.uid)",
-        "joueurs": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).exists()",
-            ".validate": "newData.child('nom').isString() && newData.child('nom').val().length >= 1 && newData.child('nom').val().length <= 18"
+        ".write": "auth != null && (root.child('mj').child(auth.uid).val() === true || root.child('mj').child(auth.uid).val() === 'true') && ((!data.exists() && newData.child('hote').val() === auth.uid) || (data.child('hote').val() === auth.uid && (!newData.exists() || newData.child('hote').val() === auth.uid)))",
+        ".validate": "$code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4,6}$/) && newData.hasChildren(['hote', 'etat'])",
+        "hote": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "cree": {
+          ".validate": "newData.isNumber()"
+        },
+        "etat": {
+          ".validate": "newData.val() === 'lobby' || newData.val() === 'jeu' || newData.val() === 'fin'"
+        },
+        "cats": {
+          ".validate": "true"
+        },
+        "fiches": {
+          ".validate": "true"
+        },
+        "fils": {
+          ".validate": "true"
+        },
+        "grandes": {
+          ".validate": "newData.isBoolean()"
+        },
+        "ferme": {
+          ".validate": "newData.isBoolean()"
+        },
+        "tirees": {
+          ".validate": "newData.isNumber()"
+        },
+        "duree": {
+          ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 3600"
+        },
+        "carte": {
+          ".validate": "newData.hasChildren(['id', 'etat'])",
+          "duree": {
+            ".validate": "newData.isNumber() && newData.val() <= 3600"
+          },
+          "fin": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 3600000"
+          },
+          "plus": {
+            "$uid": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 3600000"
+            }
+          },
+          "$autre": {
+            ".validate": "true"
           }
         },
-        "reponses": {
+        "bonnes": {
+          ".validate": "true"
+        },
+        "essais": {
+          ".validate": "true"
+        },
+        "stats": {
+          ".validate": "true"
+        },
+        "hist": {
+          ".validate": "true"
+        },
+        "affichage": {
+          ".validate": "true"
+        },
+        "joueurs": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).exists() && (data.exists() || (root.child('parties').child($code).child('ferme').val() !== true && root.child('parties').child($code).child('cree').val() > now - 86400000))",
+            ".validate": "newData.hasChildren(['nom'])",
+            "nom": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 18"
+            },
+            "enLigne": {
+              ".validate": "newData.isBoolean()"
+            },
+            "parti": {
+              ".validate": "newData.isBoolean()"
+            },
+            "t": {
+              ".validate": "newData.isNumber()"
+            },
+            "$autre": {
+              ".validate": "false"
+            }
+          }
+        },
+        "envoyes": {
           "$cid": {
             "$uid": {
-              ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && ((root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000) || (root.child('parties').child($code).child('carte/etat').val() !== 'revelee' && root.child('parties').child($code).child('carte/plus').child($uid).exists() && now <= root.child('parties').child($code).child('carte/plus').child($uid).val() + 2000))",
-              ".validate": "newData.child('txt').isString() && newData.child('txt').val().length <= 500 && newData.child('v').isNumber() && newData.child('ts').val() === now"
+              ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && root.child('parties').child($code).child('joueurs').child($uid).exists() && ((root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000) || (root.child('parties').child($code).child('carte/etat').val() !== 'revelee' && root.child('parties').child($code).child('carte/plus').child($uid).exists() && now <= root.child('parties').child($code).child('carte/plus').child($uid).val() + 2000))",
+              ".validate": "newData.val() === true"
+            }
+          }
+        },
+        "$autre": {
+          ".validate": "false"
+        }
+      }
+    },
+    "reponses": {
+      "$code": {
+        ".read": "auth != null && root.child('parties').child($code).child('hote').val() === auth.uid",
+        ".write": "auth != null && root.child('parties').child($code).child('hote').val() === auth.uid",
+        "$cid": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && root.child('parties').child($code).child('carte/id').val() === $cid && root.child('parties').child($code).child('joueurs').child($uid).exists() && ((root.child('parties').child($code).child('carte/etat').val() === 'ouverte' && now <= root.child('parties').child($code).child('carte/fin').val() + 2000) || (root.child('parties').child($code).child('carte/etat').val() !== 'revelee' && root.child('parties').child($code).child('carte/plus').child($uid).exists() && now <= root.child('parties').child($code).child('carte/plus').child($uid).val() + 2000))",
+            ".validate": "newData.hasChildren(['txt', 'v', 'ts'])",
+            "txt": {
+              ".validate": "newData.isString() && newData.val().length <= 500"
+            },
+            "v": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+            },
+            "ts": {
+              ".validate": "newData.val() === now"
+            },
+            "$autre": {
+              ".validate": "false"
+            }
+          }
+        }
+      }
+    },
+    "retours": {
+      "$code": {
+        ".read": "auth != null && root.child('parties').child($code).child('hote').val() === auth.uid",
+        ".write": "auth != null && root.child('parties').child($code).child('hote').val() === auth.uid",
+        "$cid": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".validate": "newData.hasChildren(['v', 'ok'])",
+            "v": {
+              ".validate": "newData.isNumber()"
+            },
+            "ok": {
+              ".validate": "newData.isBoolean()"
+            },
+            "more": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$autre": {
+              ".validate": "false"
             }
           }
         }

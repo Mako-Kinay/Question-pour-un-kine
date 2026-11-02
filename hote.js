@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.5.1
+   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page du maître du jeu : crée la partie, tire les cartes, voit la réponse attendue.
    Les joueurs répondent avant la fin du chrono. Le maître du jeu valide ou refuse chaque réponse.
@@ -39,6 +39,15 @@ var setupDur = DURS.indexOf(Q.lsGet(K_DUR)) >= 0 ? Q.lsGet(K_DUR) : 45;
 var busy = false, closing = false, showAnswer = true, lastCard = null, lastEtat = null, celebrated = {}, screen = null, flash = "";
 
 function saveH() { Q.lsSet(K_H, H); }
+/* Réponses et corrections sont rangées hors de la partie (reponses/CODE et retours/CODE).
+   Ainsi un joueur ne lit que les siennes. Le maître du jeu lit tout. */
+var RR = {}, VV = {}, repRef = null, retRef = null;
+/* Efface une partie et tout ce qui va avec, en une seule écriture. */
+function wipeAll(code) {
+  var u = {};
+  u["parties/" + code] = null; u["reponses/" + code] = null; u["retours/" + code] = null;
+  return db.ref().update(u);
+}
 function path(p) { return "parties/" + H.code + (p ? "/" + p : ""); }
 function demoQS() { return Q.param("demo") === "1" ? "&demo=1" : ""; }
 function joinURL() { return Q.siteURL("joueur.html?p=" + H.code + demoQS()); }
@@ -48,24 +57,108 @@ function fail(e) { flash = Q.permError(e); render(); }
 /* ---------- démarrage ---------- */
 app.innerHTML = '<section class="panel">' + Q.brand("mode multijoueur") + '<p class="lead">Connexion…</p></section>';
 Q.autoFit();
+var AUTH = null, ME = null;
 Q.connect("hote").then(function (c) {
-  db = c.db; uid = c.uid; H = Q.lsGet(K_H);
+  db = c.db; AUTH = c.auth || null;
+  if (c.demo) { uid = c.uid; return start(); }
+  if (c.user) { ME = c.user; uid = c.user.uid; return checkMJ(); }
+  renderLogin("");
+}).catch(function (e) {
+  app.innerHTML = '<section class="panel">' + Q.brand("mode multijoueur") + '<h2>Connexion impossible</h2><p class="note warn">' + esc(e.message) + "</p></section>";
+});
+
+function start() {
+  H = Q.lsGet(K_H);
   if (H && H.code) {
     db.ref("parties/" + H.code).once("value").then(function (s) {
       var v = s.val();
       if (v && v.hote === uid) renderSetup(v); else { H = null; saveH(); renderSetup(null); }
     }).catch(function () { renderSetup(null); });
   } else renderSetup(null);
-}).catch(function (e) {
-  app.innerHTML = '<section class="panel">' + Q.brand("mode multijoueur") + '<h2>Connexion impossible</h2><p class="note warn">' + esc(e.message) + "</p></section>";
-});
+}
+
+/* ---------- connexion du maître du jeu (hors mode démo) ---------- */
+var typedMail = "";
+function renderLogin(msg, info) {
+  screen = "login";
+  app.innerHTML = '<section class="panel narrow" aria-labelledby="t">' + Q.brand("mode multijoueur") +
+    '<h2 id="t">Connexion maître du jeu</h2>' +
+    '<p class="lead">Seuls les comptes maître du jeu peuvent créer une partie. Les joueurs, eux, n\'ont pas besoin de compte.</p>' +
+    '<form id="fLogin" autocomplete="on">' +
+    '<label class="field-label" for="inMail">Adresse e-mail</label><input class="big-input" id="inMail" type="email" autocomplete="username" required>' +
+    '<label class="field-label" for="inPass">Mot de passe</label><input class="big-input" id="inPass" type="password" autocomplete="current-password" required>' +
+    (msg ? '<p class="note warn" style="margin-top:12px" role="alert">' + esc(msg) + "</p>" : "") +
+    (info ? '<p class="note ok" style="margin-top:12px" role="status">' + esc(info) + "</p>" : "") +
+    '<div class="setup-foot"><button class="linkish" type="button" id="btnForgot">Mot de passe oublié ?</button><button class="primary" type="submit" id="btnLogin">Se connecter</button></div></form>' +
+    '<p class="version">Question pour un kiné · ' + Q.VERSION + "</p></section>";
+  byId("inMail").value = typedMail || Q.lsGet("qpk-mj-mail") || "";
+  byId("inMail").oninput = function () { typedMail = byId("inMail").value.trim(); };
+  (byId("inMail").value ? byId("inPass") : byId("inMail")).focus();
+  byId("fLogin").onsubmit = function (e) {
+    e.preventDefault();
+    var mail = byId("inMail").value.trim(), pass = byId("inPass").value;
+    typedMail = mail;
+    if (!mail || !pass) return;
+    byId("btnLogin").disabled = true; byId("btnLogin").textContent = "Connexion…";
+    AUTH.signInWithEmailAndPassword(mail, pass).then(function (cred) {
+      Q.lsSet("qpk-mj-mail", mail);
+      ME = cred.user; uid = cred.user.uid; checkMJ();
+    }).catch(function (err) { renderLogin(Q.authError(err)); });
+  };
+  byId("btnForgot").onclick = function () {
+    var mail = byId("inMail").value.trim();
+    if (!mail) { renderLogin("Tape d'abord ton adresse e-mail, puis clique sur « Mot de passe oublié ? »."); return; }
+    AUTH.sendPasswordResetEmail(mail).then(function () {
+      renderLogin("", "Si ce compte existe, un e-mail de réinitialisation vient d'être envoyé à " + mail + ".");
+    }).catch(function (err) { renderLogin(Q.authError(err)); });
+  };
+}
+/* Le compte doit être déclaré dans la base (mj/<identifiant> = true). Les règles Firebase le vérifient aussi. */
+function checkMJ() {
+  app.innerHTML = '<section class="panel">' + Q.brand("mode multijoueur") + '<p class="lead">Vérification du compte…</p></section>';
+  db.ref("mj/" + uid).once("value").then(function (s) {
+    if (s.val() === true || s.val() === "true") start(); else renderNotMJ("");
+  }).catch(function (e) { renderNotMJ(/permission/i.test(String(e && (e.code || e.message))) ? "Les règles Firebase de la v1.7.0 ne sont pas encore publiées (étape 5 du guide)." : String(e.message || e)); });
+}
+function renderNotMJ(msg) {
+  screen = "notmj";
+  app.innerHTML = '<section class="panel" aria-labelledby="t">' + Q.brand("mode multijoueur") +
+    '<h2 id="t">Compte pas encore déclaré</h2>' +
+    '<p class="lead">Tu es bien connecté' + (ME && ME.email ? " (" + esc(ME.email) + ")" : "") + ". Il reste à déclarer ce compte comme maître du jeu dans Firebase. C'est à faire une seule fois.</p>" +
+    '<div class="field-label">Identifiant de ton compte</div><div class="uid-box"><code id="uidTxt">' + esc(uid) + '</code><button class="mini" type="button" id="btnCopy">Copier</button></div>' +
+    '<ol class="steps-list">' +
+    "<li>Dans Firebase, ouvre Realtime Database, onglet Données.</li>" +
+    "<li>Survole la première ligne (l'adresse de la base) et clique sur le <b>+</b>.</li>" +
+    "<li>Clé : <b>mj</b>. Laisse la valeur vide et clique sur le <b>+</b> au bout de cette ligne pour lui ajouter un enfant.</li>" +
+    "<li>Clé de l'enfant : colle ton identifiant. Valeur : <b>true</b>. Clique sur Ajouter.</li>" +
+    "<li>Reviens ici et clique sur « Vérifier à nouveau ».</li></ol>" +
+    (msg ? '<p class="note warn" style="margin-top:12px">' + esc(msg) + "</p>" : "") +
+    '<div class="setup-foot"><button class="mini danger" type="button" id="btnOut">Se déconnecter</button><button class="primary" type="button" id="btnRetry">Vérifier à nouveau</button></div></section>';
+  byId("btnRetry").onclick = checkMJ;
+  byId("btnOut").onclick = logout;
+  byId("btnCopy").onclick = function () {
+    var b = byId("btnCopy");
+    (navigator.clipboard ? navigator.clipboard.writeText(uid) : Promise.reject()).then(function () { b.textContent = "Copié ✓"; }).catch(function () {
+      var r = document.createRange(); r.selectNodeContents(byId("uidTxt")); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "Sélectionné, fais Ctrl+C";
+    });
+  };
+}
+function logout() {
+  if (partyRef) { partyRef.off("value"); partyRef = null; }
+  P = null; ME = null; uid = null;
+  AUTH.signOut().then(function () { renderLogin(""); }).catch(function () { renderLogin(""); });
+}
+function accountLine() {
+  if (Q.DEMO || !ME) return "";
+  return '<p class="account-line">Connecté : <b>' + esc(ME.email || "maître du jeu") + '</b> · <button class="linkish" type="button" id="btnLogout">Se déconnecter</button></p>';
+}
 
 /* ---------- création ---------- */
 function renderSetup(resumable) {
   screen = "setup";
   app.innerHTML = Q.demoBanner() +
     '<section class="panel" aria-labelledby="t">' + Q.brand("mode multijoueur") +
-    '<h2 id="t">Créer une partie</h2>' +
+    accountLine() + '<h2 id="t">Créer une partie</h2>' +
     '<p class="lead">Vous êtes le maître du jeu. Vous voyez la question et la réponse. Les joueurs, sur leur téléphone, ne voient que la question et tapent leur réponse.</p>' +
     (resumable ? '<div class="resume-box"><span>Une partie est en cours : code <strong>' + esc(H.code) + "</strong>, " + Object.keys(resumable.joueurs || {}).length + ' joueur(s).</span><button class="ghost" type="button" id="btnResume">Reprendre</button><button class="mini danger" type="button" id="btnDrop">Effacer cette partie</button></div>' : "") +
     (HAS_FICHES ? '<div class="field-row"><div class="field-label" id="rowLabel">' + rowLabel() + '</div><div class="mode-switch" role="group" aria-label="Choisir les questions">' +
@@ -137,10 +230,11 @@ function renderSetup(resumable) {
     };
   });
   byId("btnCreate").onclick = function () { createParty(0); };
+  var lo = byId("btnLogout"); if (lo) lo.onclick = logout;
   var r = byId("btnResume"); if (r) r.onclick = function () { subscribe(); };
   var d = byId("btnDrop");
   if (d) Q.armButton(d, "Confirmer l'effacement ?", function () {
-    db.ref("parties/" + H.code).remove().catch(function () {});
+    wipeAll(H.code).catch(function () {});
     H = null; saveH(); renderSetup(null);
   });
   sum();
@@ -159,7 +253,11 @@ function createParty(tries) {
     if (useFiches()) party.fiches = effFiches().slice();
     if (setupMode === "grandes") party.grandes = true;
     if (setupMode === "fils") party.fils = setupFils.map(function (i) { return FI.fils[i][0]; });
-    return db.ref("parties/" + code).set(party).then(function () {
+    var old = H && H.code && H.code !== code ? H.code : null;
+    // Ménage : l'ancienne partie de ce maître du jeu est effacée avant d'en créer une nouvelle.
+    return (old ? wipeAll(old).catch(function () {}) : Promise.resolve()).then(function () {
+      return db.ref("parties/" + code).set(party);
+    }).then(function () {
       H = { code: code, used: [], qi: null }; saveH(); subscribe();
     });
   }).catch(function (e) { flash = Q.permError(e); renderSetup(null); });
@@ -167,11 +265,23 @@ function createParty(tries) {
 
 function subscribe() {
   if (partyRef) partyRef.off("value");
+  if (repRef) repRef.off("value");
+  if (retRef) retRef.off("value");
+  RR = {}; VV = {};
+  repRef = db.ref("reponses/" + H.code);
+  retRef = db.ref("retours/" + H.code);
+  repRef.on("value", function (s) { RR = s.val() || {}; if (P) render(); }, function () {});
+  retRef.on("value", function (s) { VV = s.val() || {}; if (P) render(); }, function () {});
   partyRef = db.ref(path());
   partyRef.on("value", function (s) {
     P = s.val();
     BY = P && P.grandes ? GR : P && Array.isArray(P.fiches) && P.fiches.length ? byFor(P.fiches) : ALL;
-    if (!P) { partyRef.off("value"); partyRef = null; H = null; saveH(); renderSetup(null); return; }
+    if (!P) {
+      partyRef.off("value"); partyRef = null;
+      if (repRef) { repRef.off("value"); repRef = null; }
+      if (retRef) { retRef.off("value"); retRef = null; }
+      H = null; saveH(); renderSetup(null); return;
+    }
     render();
   }, function (e) { flash = Q.permError(e); renderSetup(null); });
 }
@@ -213,6 +323,7 @@ function renderLobby() {
     '<div class="field-label">Joueurs connectés (' + n + ")</div>" + playersChips(true) +
     '<p class="fiches-note">Les joueurs peuvent aussi arriver ou partir pendant la partie.</p>' +
     (flash ? '<p class="note warn" style="margin-top:12px">' + esc(flash) + "</p>" : "") +
+    '<p class="row" style="margin-top:10px">' + fermeBtn() + (P.ferme ? '<span class="fiches-note" style="margin:0">Un joueur retiré maintenant ne pourra plus revenir.</span>' : "") + "</p>" +
     '<div class="setup-foot"><span class="row"><button class="ghost" type="button" id="btnScreen">Écran à projeter</button>' +
     (Q.DEMO ? '<button class="ghost" type="button" id="btnTest">Ouvrir un joueur de test</button>' : "") +
     '</span><button class="primary" type="button" id="btnGo"' + (n ? "" : " disabled") + ">Commencer la partie</button></div></section>";
@@ -220,7 +331,12 @@ function renderLobby() {
   bindCommon();
   byId("btnGo").onclick = function () { partyRef.update({ etat: "jeu" }).then(drawCard).catch(fail); };
 }
+/* Fermer les inscriptions : plus aucun nouveau joueur. Les joueurs déjà inscrits continuent. */
+function fermeBtn() {
+  return '<button class="mini' + (P.ferme ? " locked" : "") + '" type="button" id="btnFerme" aria-pressed="' + !!P.ferme + '">' + (P.ferme ? "Inscriptions fermées · rouvrir" : "Fermer les inscriptions") + "</button>";
+}
 function bindCommon() {
+  var fb = byId("btnFerme"); if (fb) fb.onclick = function () { partyRef.update({ ferme: P.ferme ? null : true }).catch(fail); };
   var s = byId("btnScreen"); if (s) s.onclick = function () { window.open(screenURL(), "_blank"); };
   var t = byId("btnTest"); if (t) t.onclick = function () { window.open(joinURL(), "_blank"); };
   Array.prototype.forEach.call(app.querySelectorAll("[data-kick]"), function (b) {
@@ -258,9 +374,13 @@ function drawCard() {
   if (QS[qi].g) upd.carte.g = true;
   upd.tirees = n;
   upd.affichage = null;
-  if (P.carte) { upd["reponses/" + P.carte.id] = null; upd["verdicts/" + P.carte.id] = null; }
+  upd.envoyes = null;
+  // La carte précédente est oubliée : ses réponses et corrections aussi.
+  var all = {};
+  Object.keys(upd).forEach(function (k) { all[path(k)] = upd[k]; });
+  all["reponses/" + H.code] = null; all["retours/" + H.code] = null;
   busy = true; showAnswer = true;
-  partyRef.update(upd).catch(fail).then(function () { busy = false; });
+  db.ref().update(all).catch(fail).then(function () { busy = false; });
 }
 function currentQ() {
   var c = P.carte;
@@ -291,10 +411,10 @@ setInterval(function () {
 /* ---------- jeu ---------- */
 function answers() {
   var c = P.carte;
-  return c && P.reponses && P.reponses[c.id] ? P.reponses[c.id] : {};
+  return c && RR[c.id] ? RR[c.id] : {};
 }
 function verdictOf(uid) {
-  var c = P.carte, r = answers()[uid], V = c && P.verdicts && P.verdicts[c.id] ? P.verdicts[c.id] : {};
+  var c = P.carte, r = answers()[uid], V = c && VV[c.id] ? VV[c.id] : {};
   if (!(r && V[uid] && V[uid].v === r.v)) return null;
   return V[uid].more ? "more" : V[uid].ok;
 }
@@ -327,11 +447,12 @@ function renderGame() {
   var nRep = act.filter(function (p) { return R[p.uid]; }).length;
   var todo = c ? act.filter(function (p) { var v = verdictOf(p.uid); return R[p.uid] && (v === null || v === "more"); }).length : 0;
   var newCard = c && c.id !== lastCard, flipNow = c && revealed && lastEtat !== "revelee" && lastEtat !== null && !newCard;
-  var src = q && q.s ? (q.u ? '<a href="' + esc(q.u) + '" target="_blank" rel="noopener">' + esc(q.s) + "</a>" : esc(q.s)) : "";
+  var qu = q ? Q.lienSur(q.u) : "";
+  var src = q && q.s ? (qu ? '<a href="' + esc(qu) + '" target="_blank" rel="noopener noreferrer">' + esc(q.s) + "</a>" : esc(q.s)) : "";
 
   app.innerHTML = Q.demoBanner() +
     '<div class="infobar"><span>Partie <span class="code">' + esc(H.code) + "</span>" + (c ? " · carte " + c.n : "") + " · " + act.length + " joueur" + (act.length > 1 ? "s" : "") + "</span>" +
-    '<span class="acts"><button class="mini" type="button" id="btnBoard" aria-pressed="' + !!P.affichage + '">' + (P.affichage ? "Masquer les badges" : "Afficher les badges") + "</button>" +
+    '<span class="acts">' + fermeBtn() + '<button class="mini" type="button" id="btnBoard" aria-pressed="' + !!P.affichage + '">' + (P.affichage ? "Masquer les badges" : "Afficher les badges") + "</button>" +
     '<button class="mini" type="button" id="btnInvite">Inviter (QR code)</button><button class="mini" type="button" id="btnScreen">Écran à projeter</button>' +
     (Q.DEMO ? '<button class="mini" type="button" id="btnTest">Joueur de test</button>' : "") +
     '<button class="mini danger" type="button" id="btnEnd">Terminer la partie</button></span></div>' +
@@ -395,12 +516,13 @@ function judge(u, ok) {
   var c = P.carte, r = answers()[u];
   if (!c || !r || c.etat === "revelee") return;
   var cur = verdictOf(u), upd = {};
-  if (cur === ok) upd["verdicts/" + c.id + "/" + u] = null;
-  else upd["verdicts/" + c.id + "/" + u] = ok === "more" ? { v: r.v, ok: false, more: true } : { v: r.v, ok: ok };
+  var rp = "retours/" + H.code + "/" + c.id + "/" + u;
+  if (cur === ok) upd[rp] = null;
+  else upd[rp] = ok === "more" ? { v: r.v, ok: false, more: true } : { v: r.v, ok: ok };
   // « Mais encore ? » : le joueur a 30 s pour compléter, même si le chrono de la carte est fini.
-  if (ok === "more" && cur !== "more") upd["carte/plus/" + u] = Math.max(Q.now() + MORE_S * 1000, c.etat === "ouverte" ? c.fin || 0 : 0);
-  else if (cur === "more") upd["carte/plus/" + u] = null;
-  partyRef.update(upd).catch(fail);
+  if (ok === "more" && cur !== "more") upd[path("carte/plus/" + u)] = Math.max(Q.now() + MORE_S * 1000, c.etat === "ouverte" ? c.fin || 0 : 0);
+  else if (cur === "more") upd[path("carte/plus/" + u)] = null;
+  db.ref().update(upd).catch(fail);
 }
 /* Compte à rebours des « Mais encore ? » dans la liste des réponses. */
 function paintCountdowns() {
@@ -412,7 +534,7 @@ function paintCountdowns() {
 function reveal() {
   if (busy || !P.carte) return;
   var c = P.carte, q = currentQ(), R = answers(), k = Q.KEY[c.cat], upd = {}, ok = {}, nOk = 0, nRep = 0;
-  upd["carte/etat"] = "revelee"; upd["carte/a"] = q.a; upd["carte/s"] = q.s || ""; upd["carte/u"] = q.u || "";
+  upd["carte/etat"] = "revelee"; upd["carte/a"] = q.a; upd["carte/s"] = q.s || ""; upd["carte/u"] = Q.lienSur(q.u);
   Object.keys(R).forEach(function (u) {
     if (!P.joueurs || !P.joueurs[u]) return;
     nRep++;
@@ -447,14 +569,18 @@ function renderEnd() {
   screen = "end";
   app.innerHTML = '<section class="panel wide" aria-labelledby="t">' + Q.brand("mode multijoueur") +
     '<h2 id="t">Classement final</h2><p class="lead">Partie ' + esc(H.code) + " · " + (P.tirees || 0) + " cartes tirées.</p>" + Q.rankingHTML(P) + Q.bilanHTML(P) +
-    '<div class="setup-foot"><button class="mini danger" type="button" id="btnWipe">Fermer la partie</button><span class="row"><button class="ghost" type="button" id="btnBack">Reprendre la partie</button><button class="primary" type="button" id="btnAgain">Rejouer avec les mêmes joueurs</button></span></div>' +
-    '<p class="note" style="margin-top:14px">« Reprendre » continue la partie, badges compris. « Rejouer » garde le même code et remet les badges à zéro. « Fermer la partie » l\'efface de la base.</p></section>';
+    '<div class="setup-foot"><button class="ghost danger" type="button" id="btnWipe">Effacer la partie</button><span class="row"><button class="ghost" type="button" id="btnBack">Reprendre la partie</button><button class="primary" type="button" id="btnAgain">Rejouer avec les mêmes joueurs</button></span></div>' +
+    '<p class="note" style="margin-top:14px">« Reprendre » continue la partie, badges compris. « Rejouer » garde le même code et remet les badges à zéro. « Effacer la partie » la supprime de la base, réponses comprises. Pense à le faire à la fin de chaque séance.</p></section>';
   Q.confetti("#F07A24", 120);
   byId("btnBack").onclick = function () { partyRef.update({ etat: "jeu" }).catch(fail); };
   byId("btnAgain").onclick = function () {
     H.used = []; H.qi = null; saveH(); lastCard = null; celebrated = {};
-    partyRef.update({ etat: "jeu", bonnes: null, essais: null, stats: null, hist: null, carte: null, reponses: null, verdicts: null, affichage: null, tirees: 0 }).then(drawCard).catch(fail);
+    var all = {};
+    ["bonnes", "essais", "stats", "hist", "carte", "envoyes", "affichage"].forEach(function (k) { all[path(k)] = null; });
+    all[path("etat")] = "jeu"; all[path("tirees")] = 0;
+    all["reponses/" + H.code] = null; all["retours/" + H.code] = null;
+    db.ref().update(all).then(drawCard).catch(fail);
   };
-  Q.armButton(byId("btnWipe"), "Confirmer ?", function () { partyRef.remove().catch(fail); });
+  Q.armButton(byId("btnWipe"), "Confirmer : effacer ?", function () { wipeAll(H.code).catch(fail); });
 }
 })();

@@ -1,5 +1,5 @@
 QUESTION POUR UN KINÉ – VERSION PÉDIATRIQUE
-Mode multijoueur v1.5.1
+Mode multijoueur v1.7.0
 
 © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
 
@@ -32,7 +32,7 @@ CE QUI EST PERMIS
 
 ÉLÉMENTS EXTÉRIEURS
 
-- Polices Fredoka et Patrick Hand : Google Fonts, sous licence SIL Open Font License.
+- Polices Fredoka et Patrick Hand : sous licence SIL Open Font License, fournies avec le jeu (LICENCE-polices-OFL.txt).
 - Firebase (Google) : service de base de données en temps réel, chargé depuis les serveurs de Google.
 - Les sources scientifiques citées dans les réponses restent la propriété de leurs auteurs.
 
