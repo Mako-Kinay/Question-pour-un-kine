@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page du maître du jeu : crée la partie, tire les cartes, voit la réponse attendue.
    Les joueurs répondent avant la fin du chrono. Le maître du jeu valide ou refuse chaque réponse.
@@ -8,7 +8,7 @@
 "use strict";
 var Q = window.QPK, QS = window.QPK_QUESTIONS || [], esc = Q.esc, byId = Q.byId;
 var app = byId("app");
-var K_H = "qpk-mj-hote", K_CATS = "qpk-mj-cats", K_FICH = "qpk-mj-fiches", K_DUR = "qpk-mj-duree";
+var K_H = "qpk-mj-hote", K_CATS = "qpk-mj-cats", K_FICH = "qpk-mj-fiches", K_DUR = "qpk-mj-duree", K_TD = "qpk-mj-td";
 var DURS = [20, 30, 45, 60, 90, 120];
 var db = null, uid = null, P = null, partyRef = null, H = null;
 var FI = window.QPK_FICHES || { groupes: [], titres: {} };
@@ -22,18 +22,31 @@ function byFor(fiches, grandes) {
   return m;
 }
 var ALL = byFor(null), GR = byFor(null, true), BY = ALL;
+/* Thèmes de TD (themes-td.js) : numéros de l'Excel partagé. Question n° N = QS[N - 1], grandes questions comprises. */
+var TD = window.QPK_TD || { questions: {}, titres: {} };
+var TD_IDS = Object.keys(TD.questions || {}).filter(function (k) { return Array.isArray(TD.questions[k]); });
+function idxOfNum(n) { for (var i = 0; i < QS.length; i++) if ((QS[i].n || i + 1) === n) return i; return -1; }
+function byNums(nums) {
+  var m = {};
+  (nums || []).forEach(function (n) { var i = idxOfNum(+n); if (i >= 0) (m[QS[i].c] = m[QS[i].c] || []).push(i); });
+  return m;
+}
+function tdTitre(id) { return (TD.titres && TD.titres[id]) || id; }
+function tdCount(id) { var b = byNums(TD.questions[id]); return Object.keys(b).reduce(function (t, c) { return t + b[c].length; }, 0); }
+var setupTD = TD_IDS.indexOf(Q.lsGet(K_TD)) >= 0 ? Q.lsGet(K_TD) : "";
 var HAS_G = Object.keys(GR).length > 0;
 var lastF = Q.lsGet(K_FICH) || {};
-var setupMode = HAS_FICHES && (lastF.mode === "fiches" || (lastF.mode === "fils" && FI.fils.length) || (lastF.mode === "grandes" && HAS_G)) ? lastF.mode : "cats";
+/* v1.9.0 : les fils rouges sont remplacés par les thèmes de TD. Restent : par catégorie, par fiche (ou chapitre entier), grandes questions. */
+var setupMode = HAS_FICHES && (lastF.mode === "fiches" || (lastF.mode === "grandes" && HAS_G)) ? lastF.mode : "cats";
 var setupFiches = Array.isArray(lastF.fiches) ? lastF.fiches.filter(function (n) { return FI.titres[n]; }) : [];
 var setupFils = Array.isArray(lastF.fils) ? lastF.fils.filter(function (i) { return FI.fils[i]; }) : [];
-/* Fiches retenues : cochées (« Par fiche ») ou couvertes par les fils rouges cochés (« Par fil rouge »). */
-function effFiches() { return setupMode === "fils" ? Q.filsUnion(FI.fils, setupFils) : setupFiches; }
-function rowLabel() { return setupMode === "fiches" ? "Fiches en jeu" : setupMode === "fils" ? "Fils rouges en jeu" : setupMode === "grandes" ? "Grandes questions" : "Catégories en jeu"; }
-function useFiches() { return setupMode === "fiches" || setupMode === "fils"; }
+/* Fiches retenues : celles cochées dans « Par fiche » (un chapitre entier ou quelques fiches). */
+function effFiches() { return setupMode === "fiches" ? setupFiches : []; }
+function rowLabel() { return setupMode === "fiches" ? "Fiches en jeu" : setupMode === "grandes" ? "Grandes questions" : "Catégories en jeu"; }
+function useFiches() { return !setupTD && setupMode === "fiches"; }
 var setupCats = (Q.lsGet(K_CATS) || Q.CAT_IDS).filter(function (c) { return ALL[c]; });
 if (!setupCats.length) setupCats = Q.CAT_IDS.filter(function (c) { return ALL[c]; });
-function setupBY() { return setupMode === "grandes" ? GR : setupMode === "cats" ? ALL : byFor(effFiches()); }
+function setupBY() { return setupTD ? byNums(TD.questions[setupTD]) : setupMode === "grandes" ? GR : setupMode === "cats" ? ALL : byFor(effFiches()); }
 function setupActiveCats() { var b = setupBY(); return setupCats.filter(function (c) { return b[c]; }); }
 var setupDur = DURS.indexOf(Q.lsGet(K_DUR)) >= 0 ? Q.lsGet(K_DUR) : 45;
 var busy = false, closing = false, showAnswer = true, lastCard = null, lastEtat = null, celebrated = {}, screen = null, flash = "";
@@ -161,14 +174,19 @@ function renderSetup(resumable) {
     accountLine() + '<h2 id="t">Créer une partie</h2>' +
     '<p class="lead">Vous êtes le maître du jeu. Vous voyez la question et la réponse. Les joueurs, sur leur téléphone, ne voient que la question et tapent leur réponse.</p>' +
     (resumable ? '<div class="resume-box"><span>Une partie est en cours : code <strong>' + esc(H.code) + "</strong>, " + Object.keys(resumable.joueurs || {}).length + ' joueur(s).</span><button class="ghost" type="button" id="btnResume">Reprendre</button><button class="mini danger" type="button" id="btnDrop">Effacer cette partie</button></div>' : "") +
+    '<div class="field-row"><label class="field-label" for="selTD">Thème de TD</label><span class="td-count" id="tdCount" aria-live="polite"></span></div>' +
+    '<select class="big-input td-select" id="selTD"><option value="">Toutes les questions</option>' +
+    TD_IDS.map(function (k) { return '<option value="' + esc(k) + '"' + (k === setupTD ? " selected" : "") + ">" + esc(tdTitre(k)) + "</option>"; }).join("") + "</select>" +
+    '<div id="modeArea"' + (setupTD ? " hidden" : "") + ">" +
     (HAS_FICHES ? '<div class="field-row"><div class="field-label" id="rowLabel">' + rowLabel() + '</div><div class="mode-switch" role="group" aria-label="Choisir les questions">' +
-      '<button type="button" data-mode="cats" aria-pressed="' + (setupMode === "cats") + '">Par catégorie</button><button type="button" data-mode="fiches" aria-pressed="' + (setupMode === "fiches") + '">Par fiche</button>' +
-      (FI.fils.length ? '<button type="button" data-mode="fils" aria-pressed="' + (setupMode === "fils") + '">Par fil rouge</button>' : "") +
+      '<button type="button" data-mode="cats" aria-pressed="' + (setupMode === "cats") + '">Par catégorie</button>' +
+      '<button type="button" data-mode="fiches" aria-pressed="' + (setupMode === "fiches") + '">Par fiche</button>' +
       (HAS_G ? '<button type="button" data-mode="grandes" aria-pressed="' + (setupMode === "grandes") + '">Grandes questions</button>' : "") + "</div></div>" +
-      '<p class="fiches-note" id="grandesBox"' + (setupMode === "grandes" ? "" : " hidden") + '>Une grande question par fiche. Elles demandent une réponse construite, à discuter ensemble. Elles ne sortent pas dans les trois autres modes.</p>' +
-      '<div id="fichesBox"' + (setupMode === "fiches" ? "" : " hidden") + '>' + Q.fichesPicker(FI, QS, setupFiches) + "</div>" +
-      (FI.fils.length ? '<div id="filsBox"' + (setupMode === "fils" ? "" : " hidden") + '>' + Q.filsPicker(FI.fils, FI.titres, QS, setupFils) + "</div>" : "") : "") +
-    '<div class="field-label" id="catsLabel"' + (HAS_FICHES && setupMode === "cats" ? " hidden" : "") + '>Catégories en jeu</div>' +
+      '<p class="fiches-note" id="grandesBox"' + (setupMode === "grandes" ? "" : " hidden") + '>Une grande question par fiche. Elles demandent une réponse construite, à discuter ensemble. Elles ne sortent pas dans les autres modes.</p>' +
+      '<p class="fiches-note" id="fichesHelp"' + (setupMode === "fiches" ? "" : " hidden") + '>Coche un chapitre entier, ou seulement certaines fiches.</p>' +
+      '<div id="fichesBox"' + (setupMode === "fiches" ? "" : " hidden") + '>' + Q.fichesPicker(FI, QS, setupFiches) + "</div>" : "") +
+    "</div>" +
+    '<div class="field-label" id="catsLabel"' + (HAS_FICHES && setupMode === "cats" && !setupTD ? " hidden" : "") + '>Catégories en jeu</div>' +
     '<div class="cats" id="cats"></div>' +
     '<p class="fiches-note" id="lowNote" hidden></p>' +
     '<div class="field-label">Temps pour répondre</div><div class="mode-switch durs" role="group" aria-label="Temps pour répondre">' +
@@ -179,14 +197,16 @@ function renderSetup(resumable) {
     '<p class="version">Question pour un kiné · ' + Q.VERSION + "</p></section>";
   flash = "";
   function sum() {
-    var k = setupActiveCats().length;
+    var k = setupActiveCats().length, b = setupBY();
+    var nq = setupActiveCats().reduce(function (t, c) { return t + b[c].length; }, 0);
+    byId("tdCount").textContent = nq + " question" + (nq > 1 ? "s" : "") + " disponible" + (nq > 1 ? "s" : "");
     var noFiche = useFiches() && !effFiches().length;
-    byId("summary").textContent = noFiche ? (setupMode === "fils" ? "Choisissez au moins un fil rouge." : "Choisissez au moins une fiche.") : k ? k + " catégorie" + (k > 1 ? "s" : "") + " : " + k + " badge" + (k > 1 ? "s" : "") + " à faire monter jusqu'à l'or." : "Choisissez au moins une catégorie.";
+    byId("summary").textContent = noFiche ? "Choisissez au moins une fiche ou un chapitre." : k ? k + " catégorie" + (k > 1 ? "s" : "") + " : " + k + " badge" + (k > 1 ? "s" : "") + " à faire monter jusqu'à l'or." : "Choisissez au moins une catégorie.";
     byId("btnCreate").disabled = !k || noFiche;
   }
   function drawCats() {
     var b = setupBY();
-    byId("cats").innerHTML = Q.CATS.filter(function (c) { return setupMode === "cats" || b[c.id]; }).map(function (c) {
+    byId("cats").innerHTML = Q.CATS.filter(function (c) { return (!setupTD && setupMode === "cats") || b[c.id]; }).map(function (c) {
       var n = b[c.id] ? b[c.id].length : 0;
       return '<button type="button" class="cat-toggle" style="--c:' + c.color + ";--t:" + c.text + '" data-cat="' + esc(c.id) + '" aria-pressed="' + (n > 0 && setupCats.indexOf(c.id) >= 0) + '"' + (n ? "" : " disabled") + '><span class="dot">✓</span>' + esc(c.id) + ' <span class="n">' + n + "</span></button>";
     }).join("");
@@ -203,7 +223,7 @@ function renderSetup(resumable) {
   }
   function lowNote() {
     var b = setupBY(), el = byId("lowNote");
-    var low = setupMode !== "cats" ? setupActiveCats().filter(function (c) { return b[c].length < 3; }) : [];
+    var low = setupMode !== "cats" && !setupTD ? setupActiveCats().filter(function (c) { return b[c].length < 3; }) : [];
     el.hidden = !low.length;
     el.textContent = low.length ? "Peu de questions en " + low.map(function (c) { return c + " (" + b[c].length + ")"; }).join(", ") + " : ces cartes reviendront souvent. Vous pouvez décocher ces catégories." : "";
   }
@@ -212,7 +232,7 @@ function renderSetup(resumable) {
       setupMode = bt.dataset.mode;
       Array.prototype.forEach.call(app.querySelectorAll(".mode-switch button"), function (x) { x.setAttribute("aria-pressed", x === bt); });
       byId("fichesBox").hidden = setupMode !== "fiches";
-      if (byId("filsBox")) byId("filsBox").hidden = setupMode !== "fils";
+      byId("fichesHelp").hidden = setupMode !== "fiches";
       byId("grandesBox").hidden = setupMode !== "grandes";
       byId("catsLabel").hidden = setupMode === "cats";
       byId("rowLabel").textContent = rowLabel();
@@ -220,8 +240,14 @@ function renderSetup(resumable) {
       drawCats();
     };
   });
+  byId("selTD").onchange = function () {
+    setupTD = this.value; Q.lsSet(K_TD, setupTD || null);
+    byId("modeArea").hidden = !!setupTD;
+    byId("catsLabel").hidden = HAS_FICHES && setupMode === "cats" && !setupTD;
+    setupCats = setupTD || setupMode !== "cats" ? Q.CAT_IDS.slice() : (Q.lsGet(K_CATS) || Q.CAT_IDS).filter(function (c) { return ALL[c]; });
+    drawCats();
+  };
   if (HAS_FICHES) Q.bindFichesPicker(byId("fichesBox"), function (list) { setupFiches = list; setupCats = Q.CAT_IDS.slice(); drawCats(); });
-  if (HAS_FICHES) Q.bindFilsPicker(byId("filsBox"), function (list) { setupFils = list; setupCats = Q.CAT_IDS.slice(); drawCats(); });
   drawCats();
   Array.prototype.forEach.call(app.querySelectorAll("[data-dur]"), function (bt) {
     bt.onclick = function () {
@@ -247,18 +273,17 @@ function createParty(tries) {
   db.ref("parties/" + code).once("value").then(function (s) {
     if (s.exists()) { if (tries < 6) return createParty(tries + 1); throw new Error("Impossible de trouver un code libre, réessayez."); }
     var cats = setupActiveCats();
-    if (setupMode === "cats") Q.lsSet(K_CATS, setupCats);
+    if (setupMode === "cats" && !setupTD) Q.lsSet(K_CATS, setupCats);
     Q.lsSet(K_FICH, { mode: setupMode, fiches: setupFiches, fils: setupFils });
     var party = { hote: uid, cree: Q.NOW, etat: "lobby", cats: cats, tirees: 0, duree: setupDur };
     if (useFiches()) party.fiches = effFiches().slice();
-    if (setupMode === "grandes") party.grandes = true;
-    if (setupMode === "fils") party.fils = setupFils.map(function (i) { return FI.fils[i][0]; });
+    if (!setupTD && setupMode === "grandes") party.grandes = true;
     var old = H && H.code && H.code !== code ? H.code : null;
     // Ménage : l'ancienne partie de ce maître du jeu est effacée avant d'en créer une nouvelle.
     return (old ? wipeAll(old).catch(function () {}) : Promise.resolve()).then(function () {
       return db.ref("parties/" + code).set(party);
     }).then(function () {
-      H = { code: code, used: [], qi: null }; saveH(); subscribe();
+      H = { code: code, used: [], qi: null, td: setupTD || null }; saveH(); subscribe();
     });
   }).catch(function (e) { flash = Q.permError(e); renderSetup(null); });
 }
@@ -275,7 +300,7 @@ function subscribe() {
   partyRef = db.ref(path());
   partyRef.on("value", function (s) {
     P = s.val();
-    BY = P && P.grandes ? GR : P && Array.isArray(P.fiches) && P.fiches.length ? byFor(P.fiches) : ALL;
+    BY = H && H.td && TD.questions[H.td] ? byNums(TD.questions[H.td]) : P && P.grandes ? GR : P && Array.isArray(P.fiches) && P.fiches.length ? byFor(P.fiches) : ALL;
     if (!P) {
       partyRef.off("value"); partyRef = null;
       if (repRef) { repRef.off("value"); repRef = null; }
@@ -308,7 +333,7 @@ function lobbyBlock() {
 }
 function fichesLine() {
   var n = P.cats.reduce(function (t, c) { return t + (BY[c] ? BY[c].length : 0); }, 0);
-  var base = P && P.grandes ? "Grandes questions : une par fiche, à réponse construite (" + n + " questions)."
+  var base = H && H.td ? "Thème de TD : " + esc(tdTitre(H.td)) + " (" + n + " questions)." : P && P.grandes ? "Grandes questions : une par fiche, à réponse construite (" + n + " questions)."
     : Array.isArray(P.fiches) && P.fiches.length ? (Array.isArray(P.fils) && P.fils.length ? "Fil" + (P.fils.length > 1 ? "s" : "") + " rouge" + (P.fils.length > 1 ? "s" : "") + " : " + P.fils.map(esc).join(", ") + ". Fiches " : "Questions des fiches ") + P.fiches.join(", ") + " (" + n + " questions)."
     : P.cats.length + " catégorie" + (P.cats.length > 1 ? "s" : "") + " (" + n + " questions).";
   return '<p class="fiches-note">' + base + " " + (P.duree || 45) + " s pour répondre à chaque carte.</p>";
@@ -350,9 +375,18 @@ function bindCommon() {
 
 /* ---------- tirage ---------- */
 /* Les catégories les moins maîtrisées par les joueurs présents sortent plus souvent. Jamais deux fois de suite la même, si on a le choix. */
+function unused(c) { return BY[c].filter(function (i) { return H.used.indexOf(i) < 0; }); }
 function pickCat() {
   var cats = P.cats.filter(function (c) { return BY[c] && BY[c].length; });
   if (!cats.length) return null;
+  // Aucune question ne revient tant que toute la liste n'a pas été tirée.
+  var fresh = cats.filter(function (c) { return unused(c).length; });
+  if (!fresh.length) {
+    var pool = {}; cats.forEach(function (c) { BY[c].forEach(function (i) { pool[i] = true; }); });
+    H.used = H.used.filter(function (i) { return !pool[i]; }); saveH();
+    fresh = cats;
+  }
+  cats = fresh;
   var prev = P.carte && P.carte.cat;
   if (cats.length > 1) cats = cats.filter(function (c) { return c !== prev; });
   var act = Q.activeList(P);
@@ -365,8 +399,8 @@ function drawCard() {
   if (busy || !P) return;
   var cat = pickCat();
   if (!cat) return;
-  var pool = BY[cat].filter(function (i) { return H.used.indexOf(i) < 0; });
-  if (!pool.length) { H.used = H.used.filter(function (i) { return QS[i].c !== cat; }); pool = BY[cat].slice(); }
+  var pool = unused(cat);
+  if (!pool.length) pool = BY[cat].slice();
   var qi = pool[Math.floor(Math.random() * pool.length)];
   H.used.push(qi); H.qi = qi; saveH();
   var n = (P.tirees || 0) + 1, dur = P.duree || 45, upd = {};

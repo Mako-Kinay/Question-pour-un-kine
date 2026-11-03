@@ -1,12 +1,12 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Question pour un kiné – multijoueur : outils communs au maître du jeu, aux joueurs et à l'écran projeté.
    - Connexion : Firebase (si config.js est rempli) ou mode démo (onglets d'un même navigateur).
    - Visuels : catégories, badges, cartes, bannières, confettis, chrono. */
 window.QPK = (function () {
 "use strict";
-var VERSION = "Multijoueur v1.7.0";
+var VERSION = "Multijoueur v1.10.0";
 var CATS = [
   { id: "Développement", color: "#1E9E54", text: "#FFFFFF" },
   { id: "Neurologie", color: "#2457D6", text: "#FFFFFF" },
@@ -476,7 +476,8 @@ async function flyTriangle(fromEl, sliceEl, color) {
 function fichesPicker(FI, qs, selected, ficheOf) {
   ficheOf = ficheOf || function (i) { return qs[i].f; };
   var cnt = {};
-  qs.forEach(function (q, i) { var f = ficheOf(i); cnt[f] = (cnt[f] || 0) + 1; });
+  // Les grandes questions ont leur propre mode : elles ne comptent pas ici.
+  qs.forEach(function (q, i) { if (q.g) return; var f = ficheOf(i); cnt[f] = (cnt[f] || 0) + 1; });
   return '<div class="fiches-pick">' + FI.groupes.map(function (g, gi) {
     var nums = g[1], tot = 0, sel = 0;
     nums.forEach(function (n) { tot += cnt[n] || 0; if (selected.indexOf(n) >= 0) sel++; });

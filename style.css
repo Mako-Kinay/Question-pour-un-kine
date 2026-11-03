@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.7.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 
 /* Layout: plein écran sur le fond fourni ; carte au centre, commandes du maître du jeu dessous, camemberts des joueurs en bas. */
@@ -602,3 +602,8 @@ label.field-label { display: block; }
 /* =================== v1.7.0 : sécurité =================== */
 .ghost.danger { border-color: #B42318; color: #B42318; }
 .mini.locked { background: #FDE2E1; border-color: #E3A3AA; color: #8E1626; }
+
+/* =================== v1.8.0 : thème de TD =================== */
+.td-select { font-size: 17px; cursor: pointer; }
+.td-count { font-weight: 700; color: var(--sky-deep); font-size: 14px; }
+#modeArea[hidden] { display: none; }

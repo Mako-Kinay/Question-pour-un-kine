@@ -1,4 +1,4 @@
-Question pour un kiné – mode multijoueur (v1.7.0)
+Question pour un kiné – mode multijoueur (v1.10.0)
 ==================================================
 
 Ce dossier est le site complet. On le dépose tel quel sur GitHub Pages.
@@ -6,6 +6,7 @@ Ce dossier est le site complet. On le dépose tel quel sur GitHub Pages.
 Pages
 - index.html   : accueil (choisir maître du jeu ou joueur)
 - hote.html    : maître du jeu (sur ordinateur), avec connexion par e-mail et mot de passe
+- themes-td.js : la table des thèmes de TD (numéros des questions de l'Excel partagé)
 - joueur.html  : joueur (sur téléphone). Avec ?ecran=1 : écran à projeter
 
 À modifier par vous
