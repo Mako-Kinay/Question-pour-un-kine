@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.11.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page joueur : rejoindre une partie, voir la question, répondre avant la fin du chrono, voir ses badges.
    Avec ?ecran=1, la même page sert d'écran à projeter (question, chrono, réponse révélée,

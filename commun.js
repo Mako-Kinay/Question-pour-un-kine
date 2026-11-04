@@ -1,12 +1,12 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.11.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Question pour un kiné – multijoueur : outils communs au maître du jeu, aux joueurs et à l'écran projeté.
    - Connexion : Firebase (si config.js est rempli) ou mode démo (onglets d'un même navigateur).
    - Visuels : catégories, badges, cartes, bannières, confettis, chrono. */
 window.QPK = (function () {
 "use strict";
-var VERSION = "Multijoueur v1.10.0";
+var VERSION = "Multijoueur v1.11.0";
 var CATS = [
   { id: "Développement", color: "#1E9E54", text: "#FFFFFF" },
   { id: "Neurologie", color: "#2457D6", text: "#FFFFFF" },

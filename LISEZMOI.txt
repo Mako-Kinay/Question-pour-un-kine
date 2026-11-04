@@ -1,4 +1,4 @@
-Question pour un kiné – mode multijoueur (v1.10.0)
+Question pour un kiné – mode multijoueur (v1.11.0)
 ==================================================
 
 Ce dossier est le site complet. On le dépose tel quel sur GitHub Pages.

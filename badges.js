@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.11.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* =========================================================
    Badges écureuil – Question pour un kiné (version pédiatrique)

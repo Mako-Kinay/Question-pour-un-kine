@@ -1,5 +1,5 @@
 /* © 2026 Maxime KOSMALA, MKDE. Tous droits réservés.
-   Question pour un kiné – version pédiatrique · Multijoueur v1.10.0
+   Question pour un kiné – version pédiatrique · Multijoueur v1.11.0
    Reproduction, diffusion ou modification interdites sans accord écrit de l'auteur. Voir LICENCE.txt. */
 /* Page du maître du jeu : crée la partie, tire les cartes, voit la réponse attendue.
    Les joueurs répondent avant la fin du chrono. Le maître du jeu valide ou refuse chaque réponse.
@@ -483,6 +483,7 @@ function renderGame() {
   var newCard = c && c.id !== lastCard, flipNow = c && revealed && lastEtat !== "revelee" && lastEtat !== null && !newCard;
   var qu = q ? Q.lienSur(q.u) : "";
   var src = q && q.s ? (qu ? '<a href="' + esc(qu) + '" target="_blank" rel="noopener noreferrer">' + esc(q.s) + "</a>" : esc(q.s)) : "";
+  var oth = q && q.o && q.o.length ? q.o.map(function (o) { var l = Q.lienSur(o[1]); return l ? '<a href="' + esc(l) + '" target="_blank" rel="noopener noreferrer">' + esc(o[0]) + "</a>" : esc(o[0]); }).join(" · ") : "";
 
   app.innerHTML = Q.demoBanner() +
     '<div class="infobar"><span>Partie <span class="code">' + esc(H.code) + "</span>" + (c ? " · carte " + c.n : "") + " · " + act.length + " joueur" + (act.length > 1 ? "s" : "") + "</span>" +
@@ -501,6 +502,7 @@ function renderGame() {
     (c ? '<div class="answer-box"><h3>' + (revealed ? "Réponse affichée chez les joueurs" : "Réponse attendue · visible par vous seul") + "</h3>" +
       '<div class="a' + (showAnswer || revealed ? "" : " hidden") + '">' + esc(q ? q.a : "") + "</div>" +
       (src ? '<div class="src">Source : ' + src + "</div>" : "") +
+      (oth ? '<div class="src">Autres sources : ' + oth + "</div>" : "") +
       (revealed ? "" : '<div class="tools"><button class="mini" type="button" id="btnHide">' + (showAnswer ? "Masquer la réponse" : "Afficher la réponse") + "</button></div>") + "</div>" : "") +
     '<div class="mj-controls">' + (!c ? '<button class="primary" type="button" id="btnDraw">Tirer une carte</button>'
       : revealed ? '<button class="primary" type="button" id="btnDraw">Carte suivante</button>'
